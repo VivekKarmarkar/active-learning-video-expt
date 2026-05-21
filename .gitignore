@@ -1,0 +1,38 @@
+# Secrets / env
+.env
+.env.local
+.env.*.local
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# Scratch / temp
+tmp/
+.tmp/
+
+# Large media artifacts from yt-video-processing
+# (transcripts/derived JSON are tracked; raw downloads are not)
+*.mp4
+*.mkv
+*.webm
+*.m4a
+*.opus
+*.oga
