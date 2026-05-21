@@ -20,7 +20,7 @@ At that point the agent must autonomously execute the 8-step workflow in `proble
 
 1. `paper-download-hack` — locate and download the Mishra paper
 2. Read the paper thoroughly (no skill — direct Read of the PDF)
-3. Playwright MCP — search YouTube for a video on the paper (preferably by the authors); record the URL
+3. (Pre-pinned) Use the verified YouTube URL embedded in `problem_statement.md` — a CRUNCH Group dual-talk seminar where the first speaker, Roberto Molinaro (ETH Zürich, first author of the paper), presents the work. Only Molinaro's portion is relevant; the second talk (PINNs for relativistic hydrodynamics) is unrelated. Playwright not needed.
 4. `yt-video-processing` — download and process the video (this is the agent's substitute for "watching")
 5. Populate `video_insights.md` honestly using the a/b/c/d schema (see below)
 6. `pdf` — write a short summary focused on `video_insights.md` plus reflections on video-based learning for autonomous agents

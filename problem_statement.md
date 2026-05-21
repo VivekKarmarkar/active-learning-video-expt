@@ -4,7 +4,15 @@ Step 1: use "paper-download-hack" skill to locate and download Siddhart Mishra E
 
 Step 2: Thoroughly and deeply read the paper
 
-Step 3: Use Playwright MCP, go to YouTube and try to find videos on the research paper preferrably the authors of the paper (I do know something is out there) and make a note of the YouTube video URL
+Step 3: The YouTube video URL is pre-verified and provided: https://youtu.be/Ze76NAiZrIg
+
+Verification (yt-dlp metadata cross-checked against arXiv:2301.11167 on 2026-05-21):
+- Speaker on this paper: Roberto Molinaro (ETH Zürich) — FIRST AUTHOR of the Neural Inverse Operators paper. Full author order on arXiv: Molinaro, Yang, Engquist, Mishra.
+- Venue: CRUNCH Group seminar, recorded 2023-07-29
+- Duration: ~2h 18min (8297 s)
+- IMPORTANT: This is a TWO-TALK seminar. Only the FIRST talk is relevant (Molinaro on Neural Inverse Operators). The SECOND talk (Antonio Ferrer-Sánchez and José Antonio Font, Univ. of Valencia — Gradient-Annihilated PINNs for relativistic hydrodynamics) is UNRELATED to our paper. When reasoning in Step 5, only use content from Molinaro's portion of the transcript.
+
+Playwright/YouTube search is NOT needed — the URL is already pinned.
 
 Step 4: use your "yt-video-processing" to download and process the video (this is your way of watching the video)
 
