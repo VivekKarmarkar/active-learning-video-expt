@@ -36,6 +36,8 @@ Full report: [`video_insights.md`](video_insights.md) and [`summary.pdf`](summar
 | `CLAUDE.md` | Project context loaded by Claude Code at session start |
 | `video_insights.md` | Step 5 output — honest a/b/c/d evaluation of video vs paper |
 | `summary.pdf` | Step 6 output — 2-page summary plus reflections on agent video-based learning |
+| `reflections.md` | Post-run conversational reflections on the AI/human video-consumption asymmetry |
+| `affection.md` | Vivek's running journal of orange-robot moments worth keeping |
 | `papers/2301.11167.pdf` | The Mishra-group paper (arXiv open access) |
 | `video/transcript.txt`, `video/transcript.json` | Whisper transcription of the full 138-min seminar |
 | `video/molinaro_only.txt` | First 73 min only (Molinaro talk + Q&A), with `[mm:ss]` timestamps |
