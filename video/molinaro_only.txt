@@ -1,0 +1,590 @@
+[00:00] Welcome to this week's Cran seminar. Our first speaker today is Roberto Molinaro.
+[00:06] He's studying, he's currently a PhD student with Professor Siddharth Mishra and he has
+[00:11] completed his master's degree at ETA at Zurich in the Department of Mechanical Engineering. His
+[00:16] research focuses on scientific machine learning, specifically on applying physics-informed neural
+[00:21] networks for forward and inverse problems. In particular, he's interested in high-dimensional
+[00:26] PDEs and exploring how PINs can improve the resolution of such equations. Recently, he has
+[00:32] also ventured into the field of operator learning and its potential applications for
+[00:35] learning operators for the underlying PDEs. With that, please join me in welcoming him
+[00:40] for today's presentation. You may want to take it away. Thanks a lot for your kind introduction
+[00:46] and also thank you very much for inviting me. It's a really pleasure and so what I'm going
+[00:53] to talk about today is neural inverse operators for solving PDE inverse problems, but before
+[01:00] delving into it, I would like to acknowledge the people I work with, particularly Yunan Bjorn
+[01:09] and my supervisor Sidd, that probably many of you know, and I would like to spend
+[01:17] a couple of minutes talking about inverse problems and what means solving inverse problems.
+[01:28] So let's consider a generic forward operator, F, which can be linear or nonlinear,
+[01:35] between two different normal spaces. And now solving an inverse problem
+[01:43] consists in finding if exists a state A such that F of A is equal to U, where U is the observable,
+[01:52] so what we actually measure. And given the measurements of U, we would like to infer
+[01:58] the underlying state A. And for instance, in the context of partial differential equation,
+[02:05] the forward operator might be the operator which takes as input the coefficient of the
+[02:11] coefficient in the partial differential equation and returns the solution of the PDE. For instance,
+[02:17] in the case of the ETH equation, the forward operator can be the operator which takes as input
+[02:23] the diffusivity A and returns the solution U which corresponds to the temperature of the
+[02:28] medium. And then the inverse problem might be, for instance, given measurements of the
+[02:33] temperature U, infer the underlying conductivity of the medium. And the main question that
+[02:41] naturalizes when solving inverse problem is can we actually reconstruct in a stable way
+[02:47] the underlying coefficient A? Or in other words, if we are given two observables
+[02:54] which are very close to each other, let's say U and U prime, this is also true that the
+[03:00] corresponding states A and A prime are also close to each other. And this is known as stability
+[03:08] of the inverse problem. And unfortunately, the bad news is that most inverse problems are
+[03:13] ill-posed. So this means that even though two observables are very close to each other,
+[03:19] the corresponding states can be very, very different. And this is what makes inverse
+[03:24] problems ill-posed. And now I would like to give you some examples of inverse problems.
+[03:31] The first one is electrical impedance homography. This is widely used in the medical field.
+[03:37] And what is done is to apply a voltage at a given point on the boundary of the object.
+[03:46] This voltage triggers a current inside the body. And then the corresponding
+[03:54] intensity of the current is measured at the boundary of the object. And now given the
+[04:00] measurements of the intensity of the current at the boundary of the object,
+[04:06] one wants to infer the internal structure of the object.
+[04:13] And in mathematical terms, this problem is modelled through the Poisson equation,
+[04:18] where the interior structure of the object is described through the conductivity of the medium.
+[04:26] And then the inverse problem consists in finding the conductivity A, given measurements of the
+[04:33] intensity of the current at the boundary, where the intensity of the current is nothing but
+[04:37] the normal trace of the solution at the boundary. A similar example is optical imaging.
+[04:46] And the difference with respect to, compared to the electrical impedance homography,
+[04:52] is that in this case, the scan is done through light. And despite the similarity,
+[05:00] the mathematical model describing this phenomenon is completely different,
+[05:05] because here we have the radiative transport equation. And the inverse problem consists in
+[05:10] finding the so-called scattering coefficient, given the measurements of the intensity of the radiation,
+[05:17] which leaves the domain. But the main goal is the same. Given measurements of the solution
+[05:26] or measurements of the observable at the boundary, infer the internal structure of the
+[05:33] object, which can be modelled through the conductivity of the medium, if we are talking
+[05:37] about electrical impedance homography, or the scattering coefficient, if we are talking about
+[05:41] optical imaging. But the idea is the same. And one similar example is also seismic imaging.
+[05:50] And what is done is to send some waves in the ground from a source, which is located at the
+[06:02] top surface of the ground. These waves are reflected through different layers of the soil.
+[06:12] And the corresponding pressure variation due to these reflected waves is measured at some
+[06:18] receivers, which are again located at the top surface of the domain. And the inverse problem is
+[06:25] to infer the velocity of the wave, which is a direct measure of the internal property of the
+[06:33] object, given the measurements of the pressure variation at these receivers. So all these
+[06:44] problems share a similar structure. For all these problems, we aim at reconstructing the
+[06:52] interior properties of the object, given measurements which are taken only at the boundary.
+[06:59] And the main issue of solving this problem is that measurements of the observable,
+[07:06] which arise for a single instance of the boundary data, do not suffice to infer the underlying
+[07:15] coefficient that we are looking for. So to make it more clear, if we go back to the example
+[07:21] of the electrical impedance homography, if we set the voltage potential at this point,
+[07:26] we measure the corresponding intensity of the current. And then given these measurements,
+[07:31] which are realized for one single realization of the voltage, and we try to infer the conductivity
+[07:38] even given these single measurements, then there is no hope to stably reconstruct the
+[07:45] underlying coefficient. And actually what is done for when solving these type of problems
+[07:53] is to first apply a voltage potential at this point on the boundary of the domain
+[08:01] and measure the corresponding intensity of the current, let's say psi one.
+[08:05] Then move the source on another point of the boundary of the domain and obtain the corresponding
+[08:11] intensity of the current and keep doing these several times until we cover the entire
+[08:19] boundary of the object through these sources here. And now, given the collections of the
+[08:27] measurements psi one, psi two, psi three, psi four, and so on, each of them obtained by different
+[08:33] realizations of the boundary data G1, G2, G3, we try to reconstruct the coefficient. And now
+[08:42] in this case, we can reconstruct the coefficient in a stable way. In more rigorous terms, for all these
+[08:56] problems, the observable is actually an operator, in particular a boundary operator, namely an
+[09:05] operator which takes as input a function which is defined on the boundary of the domain
+[09:10] and returns a function which is still defined on the boundary of the domain. And now if we consider
+[09:18] the map, which takes as input this operator and returns the underlying coefficient that we are
+[09:26] interested in, then this map is unique and weakly stable. So
+[09:35] now this boundary operator lambda a is different for any of these problems and it depends on the
+[09:45] structure of the partial differential equation. But the idea is exactly the same. For all these
+[09:49] problems, we can construct this map which takes as input this operator and returns the
+[09:56] underlying coefficient. For instance, in the case of the EIT, the boundary operator is the Dirichlet
+[10:03] to Noman map. For the optical imaging is the so-called Albedo operator, the operator which
+[10:09] takes as input the radiation which enters the domain and returns the radiation which leaves
+[10:15] the domain. And for the seismic imaging, we have the source to receiver map. So again, for all
+[10:23] these problems, share a similar structure. And for all these problems, the map which takes as
+[10:30] input a boundary operator, which can be different based on the nature of the PDE and returns the
+[10:37] coefficient of interest, this map is well posed, is at least unique and stable.
+[10:48] And the main issue of solving these inverse problems is that they are
+[10:53] very computationally expensive. And therefore, what we aim to do is to replace these
+[11:00] inverse maps with a surrogate deep learning data-driven model. But in order to construct
+[11:11] this data-driven model, we need two main building pieces, namely a data and a model.
+[11:21] So before going on, is there any question at this point? So we are addressing a class of
+[11:31] inverse problems where the map from operator to functions, in particular a boundary operator to
+[11:37] function is well posed. And now what we are trying to do is to approximate these inverse map
+[11:43] through data-driven model. What we are going to do now is to specify how the data and the model
+[11:49] should look like or might look like for this type of supervised learning model task.
+[11:59] Roberto, this is Sukou from Davis. I had just had a question on the previous slide
+[12:04] when you when you impose essential boundary conditions at two points.
+[12:11] You mean here? Yeah, exactly. So what were the boundary conditions for the remaining part
+[12:18] of the boundary? Is it zero flux or something? You can imagine a point source boundary conditions.
+[12:26] Actually, when we run the experiments, for instance, we use some kind of
+[12:32] wave type boundary conditions which are defined on the entire boundary of the domain. And these
+[12:39] are usually Dirichlet boundary conditions, at least the electrical impedance tomography.
+[12:47] Yeah, exactly. Yes. So you can imagine that it's, they say one at this point and zero
+[12:54] everywhere else. So just a function. Like a hat function, like a hat function, right?
+[12:58] Yes, for instance, but this can be kind of arbitrary. And maybe it's going to get clear
+[13:04] also once I talk about the data structure. Yeah, okay, thanks. Yeah, sure. You're welcome.
+[13:11] Feel free to interrupt me at any point if you have any question. Okay.
+[13:20] Claudia, I can ask one more question quickly. Can you can you impose
+[13:24] flux, like zero flux boundary conditions and knock off the constant, which is the null space
+[13:29] by the average, because the average is going to be some number, right? So is it possible to do that?
+[13:35] Actually, also for this problem, also the Neumann to Dirichlet map, if you consider the operator
+[13:42] which takes as input the Neumann data and returns the Dirichlet data, and the inverse map which
+[13:46] takes this operator as input and returns the coefficient, this is also well posed. So you
+[13:51] can also impose the as you can also impose a flux function. Absolutely, yes.
+[13:58] I was thinking about the DTN map, basically. That's why. Yes, absolutely. You can consider
+[14:03] either the DTN map or the NTD map. Actually, NTD is even better because it's more stable than the DTN.
+[14:11] Okay, so data. First, the essential first, the first point is how to discretize this
+[14:27] input operator, because now again, we are trying to solve the supervised learning task where the
+[14:34] input to the map to the map is an operator. And actually, from what I told before,
+[14:44] this should be already kind of clear. So one way of discretizing this operator is to consider the
+[14:55] tuple of input and output functions, g1, psi1, g2, psi2, g3, psi3, and so on. And those are nothing
+[15:05] but realizations or samples from the underlying operator. So you apply a given boundary data g1,
+[15:15] you can obtain the corresponding observable psi1, which is nothing but the action
+[15:21] of the underlying operator on the corresponding boundary data. And then you repeat this process
+[15:30] at times. And now our discretized version of our input operator is this
+[15:39] collection of input and output functions, where again, the output functions are nothing but the
+[15:45] actions of the operator on the input functions. And now if we assume that the operator is
+[15:54] injective, we can kind of forget about the inputs. And we can only consider as a potential
+[16:02] representation of the discrete operator, just the collections of these output measurements, psi1,
+[16:11] l. So we have l, which is actually also pretty consistent with what is done in practice. Because
+[16:17] again, in practice, what you do is just to measure the observable and then given the
+[16:21] measurements of the observable inferred the underlying coefficient. But now,
+[16:26] instead of having one measurements of the observable, we have l different measurements
+[16:31] of the observable, each realized by different, for instance, locations of the boundary data.
+[16:41] And now we move to the actual generation of the training data. So what we do,
+[16:47] because of course, the training of the model is done through synthetic data. So we generate
+[16:58] ourselves the data in order to learn the underlying map. And what we do is to fix a given distribution
+[17:08] over or probability distribution over the input functions g. And we use the same,
+[17:17] and we draw from this distribution l different functions gl. And we fix them. So now we consider
+[17:28] an additional distribution nu a on the coefficients. And we draw a random coefficient
+[17:38] from this distribution. And now for each of these realizations of the Dirichlet data,
+[17:45] we solve the underlying partial differential equation, which is in this case is the Darcy
+[17:51] equation with the coefficient a and with boundary conditions g1, g2, g3, and so on.
+[17:57] And then we compute the corresponding observables. In this case, the Neumann trace of the solution.
+[18:04] And again, this operator simply arises from the nature of the partial differential equation.
+[18:10] So we don't know exactly how to compute this, but this again comes from solving the PDE.
+[18:19] And now the tuple of l input, l measurements psi l and coefficient a define one single
+[18:31] data sample. And of course, now we can repeat this process with the same realizations of
+[18:40] boundary data gel for n different realizations of the coefficients a. And then we put them
+[18:48] together in order to construct the training data. So this is how the training data looks
+[18:52] like. We have n samples defined by input obtained as a collection of l functions and output,
+[19:01] which is a single function, the coefficient of interest. Okay, so is this clear? Because now
+[19:12] we are going to move to the model part based on this construction of the data.
+[19:18] Yeah. So one quick question. This is Dar from Brown. How are you solving the forward part,
+[19:23] like you're using some runicuta? No, because this is a time independent problem. So we just
+[19:30] use a linear solver. Oh, you solve directly? Yeah, we solve it directly in order to generate
+[19:40] these training data. So these data are synthetically generated. So again, we consider
+[19:45] differentizations of the boundary data. We draw a random different coefficients.
+[19:49] For each of them, we solve the problems. And then we assemble these data. But the PDE is
+[19:55] solved numerically by finite differences, finite elements, standard numerical methods.
+[20:01] Oh, I was asking, because the follow up question would be, what's the order of that
+[20:09] question? Because you have a lot of surface waves and a lot of phenomenons
+[20:14] that you will get only if you solve it high order. And then your
+[20:20] finite differences of finite elements have to be high order.
+[20:23] No, actually, we use a second order finite differences to solve these problems.
+[20:30] We don't have extremely high frequencies for the boundary data.
+[20:39] Okay. Cool. Thank you. You're welcome. Can I ask you a question also? This is
+[20:45] from Sandhya National Labs. Can you comment on whether you imagine in the future that you would
+[20:53] want to generalize to different geometries? So right here, you're working with the
+[20:58] coefficients. But are you envisioning that as an extension in the future?
+[21:07] Yes. I mean, of course, it can be extended. Because after all, so for the time being,
+[21:14] okay, so this is still the, let's say, the continuous version of the problem,
+[21:18] at least in terms of functions. Because now we have discretized the input operator,
+[21:23] but still these psi L and these A are functions. And this can be defined on any arbitrary domain.
+[21:31] The main issue is then on a discrete level, how to represent these functions.
+[21:37] And so far, we have considered only the case of Cartesian grid points or
+[21:44] let's say points on a circular domain. But also in that case, you can kind of
+[21:54] simplify to Cartesian set of points in polar coordinates. But of course, then you can apply
+[22:00] any type of data transformation prior. You can kind of discretize these functions
+[22:09] on a set of points that you wish. Then the only thing that matters is how you build the
+[22:18] underlying model. Because each model can deal with different data structures in terms of where you
+[22:25] discretize the functions. So in principle, you can discretize it everywhere. And it doesn't
+[22:31] matter if it's a square, a circular domain, complex domain. But then of course, you have to adopt the
+[22:40] architecture in order to deal with this type of data. But yeah, I mean, there is a potential
+[22:49] application to also other different domains. Understood. Thanks. You're welcome. Okay.
+[22:59] So actually, also according to what I was saying before now, when it comes to the construction
+[23:10] of the model, the learning model has to be consistent or has to respect the inherent
+[23:19] properties of the problem or the task at hand. And in particular, what are the main properties
+[23:29] that we would like the approximate model to satisfy? So first of all, the model that we
+[23:37] are trying to approximate or to construct is a model which takes functions which are defined
+[23:44] on the input and returns functions which are defined on the boundary and returns
+[23:52] functions which are defined in the interior domain. So boundary to interior. And now
+[23:59] second and more important point, this inverse map is a map from operators to functions. And so
+[24:08] what does it mean? I mean, what does it imply? First of all, we would like that at testing time,
+[24:14] the model should be able to handle any arbitrary number of functions L tilde,
+[24:20] discretizing the input operator. No matter if we have L functions, 2L functions,
+[24:26] M functions, we would like the model to be able to handle without retraining any arbitrary number
+[24:32] of functions. And we'd like the model performance also to be independent of how many functions we
+[24:38] chose to discretize our input operator. Or in other words, we would like the model to be
+[24:45] independent of how we discretized input operator. And that's because of course,
+[24:52] if we imagine to deploy this model for
+[24:58] usage later on, then we might have given inputs, let's say measurements of the given observables,
+[25:11] which are taken not in the exact same way we generate is the training data. Maybe we generated
+[25:19] the training data by using 10 functions. And then we receive, we are asked to compute
+[25:28] the underlying coefficient at inference for maybe 10 measurements because the prediction has taken
+[25:36] 10 measurements. And we would like the model to be independent of how many functions, how many
+[25:42] measurements are taken. And so before delving into the specific architecture,
+[25:55] a little overview about the so-called operator learning framework that probably many of you
+[26:01] are already familiar with. So operator learning consists in functions to function map
+[26:07] approximation. And here we are doing some things that are different because now we are trying
+[26:11] to approximate operators to functions map. And there are many wide-use architectures.
+[26:20] One very common architecture is DIPONET. So DIPONET belongs to the class of operator networks
+[26:34] and it approximates the output function as a linear combination of some basis functions
+[26:44] tau with the given coefficients beta, where the basis functions tau depend only on the set
+[26:51] of points where we would like to evaluate our output function, whereas the coefficients depend
+[27:01] only on the input function f. And it's standard practice to approximate both the branch
+[27:08] and the trunk, sorry, the coefficients of this function and the basis of these functions
+[27:15] with neural networks. And we call the branch net, the network approximating the coefficient
+[27:22] and trunk net, the network approximating the basis. And a nice property of DIPONET is that
+[27:31] it can approximate functions, input and output function, let's say operators between functions
+[27:38] which are defined on any arbitrary domain. So the domain definition of the input function f
+[27:45] and the output function h can be completely different. And this is actually a very
+[27:52] useful property for our purpose. However DIPONET, as I mentioned before,
+[28:00] it approximates operators, namely maps between functions and functions. So we need to modify
+[28:09] we need to modify a bit the architecture in order to be useful for our case.
+[28:16] One additional architecture which is very used nowadays is Fourier Neural Operator.
+[28:22] And this consists of the composition of different operators. First, the input function is lifted
+[28:30] to do to an i-dimensional space through a linear transformation R. And then the output of
+[28:37] this transformation is passed through a set of Fourier layers. And finally it's projected
+[28:42] back to the original space through the projection Q. Actually the details of the
+[28:47] architectures are not relevant for the purpose of this presentation. But the main take home messages
+[28:57] concerning FNO is that this architecture, differently from DIPONET, is based on a non-linear
+[29:04] reconstruction. And therefore it can be very expressive, in particular when it comes to
+[29:10] discontinuous functions. And for our purpose we might end up dealing with the discontinuous
+[29:19] functions. For instance, if you imagine again the composition of the soil or the ground,
+[29:24] this can be given by different layers which can be represented by discontinuous functions.
+[29:29] So we would like to have some expressive power when it comes to discontinuous functions.
+[29:36] However, FNO can only approximate operators between functions which are defined on the same
+[29:43] domain, at least the plain vanilla version of FNO. And also, like DIPONET, FNO approximates operator.
+[29:52] So again, it's not completely useful for our purpose. So the architecture that we propose
+[30:00] is called neural inverse operator. And now, based on the main properties that we would like the model
+[30:08] to show, I will build up on these points, different elements of the architecture.
+[30:21] So first of all, in order to address the first point, namely input and output which are
+[30:28] defined on different domains, while still keeping the expressive power of FNO,
+[30:35] we combine together DIPONET and FNO. So what you observe here, this one is the branch net of
+[30:42] DIPONET. And this is the trunk net of DIPONET. And then we have a set of three layers here.
+[30:50] So the branch net takes as input the collections of the L functions. So this is one single
+[30:59] data sample. And it constructs the coefficients of the linear expansion of DIPONET.
+[31:12] The trunk net takes as input the variable set, which corresponds to a discrete version of the
+[31:18] interior domain. So in this case, just Cartesian grid points discretizing the
+[31:24] interior domain. So again, these functions are defined on the boundary, whereas Z is a
+[31:29] discrete representation of the interior domain. And the trunk net returns the basis of this
+[31:36] expansion. And now these weights and basis are assembled together in order to construct these
+[31:43] L different functions, which are now defined in the interior domain. So DIPONET moved
+[31:50] the reconstruct from the boundary data some latent variable, which is defined in the
+[31:57] interior domain. And now these set of functions are passed through the linear transformation R,
+[32:04] which returns the variable, again, a second latent variable H,
+[32:10] which is then processed through a set of different Fourier layer. And now you can
+[32:17] see here how this function, this function, this operation looks like. This is simply a weighted
+[32:24] average of these functions f of L, each of its own weight, WL. And now what you can imagine
+[32:35] this architecture doing is first DIPONET tries to construct the solution of the partial
+[32:44] differential equation inside the domain, given the measurements taken at the boundary of the domain.
+[32:50] And then what the Fourier layers and, you know, like this part of the architecture does
+[32:56] is to perform the inversion, given the solution of the PDE in the domain, obtain the corresponding
+[33:04] underlying coefficient. And the main issue of the architecture as it is right now
+[33:14] is that this architecture, despite being able to approximate, despite being able to handle inputs
+[33:23] and outputs which are defined on different domains, still we have the problem that at testing time,
+[33:29] if we are given L plus one function, we wouldn't know what to do with the last functions. Maybe
+[33:35] we assign to the first L the parameters WL. And then what do we do with the last one?
+[33:41] We said maybe the parameters equal to zero is not clear and it's not
+[33:48] extremely rigorous. So what we did in order to make the architecture able to handle any
+[33:59] discretization of the input operator at testing time is to replace these
+[34:03] weighted average through a simple empirical expectation. So we assign basically the same
+[34:17] weight to all these functions F of L. And now at testing time, if we're given a different
+[34:26] number of functions L tilde discretizing the input operator, what we need to do at this point
+[34:33] is just to compute the empirical expectation of these functions F of L. So this solves the
+[34:45] second point to A. So now we are able to handle at testing time any arbitrary number of functions.
+[34:52] However, as this stands now, we have no guarantee that the architecture will perform
+[34:58] equally well when we consider different number of functions. And the main objection
+[35:03] that one can do is that now we're kind of losing information because we are replacing
+[35:10] a weighted average with a global average where we are assigning the same weight to every function.
+[35:18] So somehow we lose some information. And the way we solve this problem is through
+[35:26] a so-called randomized batch. So this is an algorithmic trick. And what we do, so
+[35:37] and it works in this way.
+[35:43] What we do, so this is how our training input looks like. We have again a collection of L
+[35:49] functions. In this case, we have nine functions. So what we do at every training iteration
+[35:55] is to draw at random an integer number between one and nine. And then we draw from this box of
+[36:04] functions, let's say L at functions where L at can be anything between one and nine.
+[36:12] And then we feed the model with these collection of functions. And now there is no problem
+[36:17] with feeding the model with this input because of how we built the architecture in the
+[36:27] previous step. And then we repeat this process at every training iteration. So not at every epoch,
+[36:33] but really at every time we call the model, we draw at random a different number of functions
+[36:39] from this box. And then we feed the model with this new number of functions. So iteration one,
+[36:46] we have five functions, iteration two, we have nine functions, iteration nine, we have two, and so on.
+[36:52] And now first we don't have any smiling face here because unfortunately we don't have guarantees
+[37:00] about the mathematical guarantees about this algorithm. So we can only test the
+[37:07] effectiveness of the model through numerical experiments. But the heuristic is that,
+[37:13] so if we consider this architecture, and if we imagine there exists a distribution over these
+[37:20] functions f of L, which are the functions which the PONAT reconstructs, what you observe with the
+[37:29] first architecture is always and only the empirical expectation of these functions.
+[37:42] Instead, when you construct these sub batches of the training inputs,
+[37:49] the model is able to explore the entire probability distribution because maybe at some point you get
+[37:56] two samples with two samples, you get a very bad estimate of the empirical expectation which
+[38:01] maybe is located at the very end tail of the distribution. And then by repeating this
+[38:08] process n times with n being very, very large, somehow the model observes the entire distribution
+[38:15] over these functions. And so this is how you recover the information that you lose by replacing
+[38:24] these weighted average with this global average. One additional way to perform this task,
+[38:37] maybe instead of providing as input to the Fourier layers only the empirical expectation,
+[38:44] you compute different statistics of this distribution. You take the mean, the standard
+[38:48] deviation, the minimum, the maximum and so on. And then you provide as input to these Fourier
+[38:54] layers all these statistics. This randomized batch is just a more efficient way of doing this
+[39:02] in order to explore this distribution. Excuse me, can I ask a question? I'm Kamal from Brown.
+[39:13] Is the same model the Fourier depunit? I put the paper inside. Is it the same model?
+[39:21] I'm aware of this. I think I'm aware of this paper. The initial architecture is the same.
+[39:35] Yes. What they do is to combine depunit and Fourier. I think figure three.
+[39:48] Yeah. I think this is this architecture here, but they came after this one.
+[39:59] Okay. So this came before the other one? Yeah. This one came in already January.
+[40:06] But the architecture is same. What they do is to construct, is to combine depunit and FNO.
+[40:14] I think they also use some U or net principle here at these Fourier layers.
+[40:23] But yeah. It looks like similar. So that's how I ask the question. Is it?
+[40:29] Yeah. It's totally legit. And yes, I mean the basic architecture is the same. Yeah.
+[40:37] Okay. Thank you. Oh, it's very similar. Yeah. Thank you. You're welcome.
+[40:47] And is there any question concerning the model? Okay. So then we can
+[41:08] look at some numerical experiments. So we consider different benchmarks for the
+[41:16] electrical impedance homography. We consider a set of data whose coefficients, which we are trying to
+[41:25] infer, look like this, like similar to trigonometric functions. We have different frequencies
+[41:31] up to seven, each with different amplitude and so on. And this is how the input operator looks
+[41:39] like or at least three discrete samples of this input operator. Second example we consider for the
+[41:48] EIT is one of ART and LANGSA. And the coefficients look like this. Actually, the dataset is obtained
+[41:59] by perturbing this reference configuration with adding some noise and then solving the underlying
+[42:08] problem again with finite elements. And this is a very simplified model even though it's widely used
+[42:15] of human body midsections. These ones are the LANGSA and this one is the heart of humans. And
+[42:24] this is how again the input looks like. Third example, detection of inclusions. We have
+[42:32] scutters from one to four which are spread in the domain. And these scutters are all the same shape.
+[42:43] And what we try to reconstruct is where these scutters are located and how they look like.
+[42:54] For the optical imaging, we consider a similar example to the one before, but in 1D. And now
+[43:00] we consider different coefficients by varying the height of these scutters, the width, the location,
+[43:11] and so on. But as for seismic imaging, we consider the problem of the family of
+[43:18] coefficients belonging to the Kurbel family, just some Kurbel linear layer. That's what
+[43:24] I meant by discontinuous functions. You can see some discontinuities between different layers
+[43:31] and the Stylwell family coefficient. So the first experiment that we, the first test that we run
+[43:42] is to compute the performance on a testing set whose input are discretized in exactly the
+[43:52] same way as the training. Can I roll back? I just want to understand what do you mean by
+[44:01] family of coefficients, like the Stylwell Kurbel? What are those? Just like you change?
+[44:09] Yeah, so this is one sample from this family. And then you can have, maybe I have here one
+[44:17] additional sample. You see, this is a second example for a second sample. So you can have
+[44:25] the samples belonging to the family all share a similar property, which is these Kurbel linear
+[44:32] layers corresponding to different layers of the ground. But it's just like a family of
+[44:37] coefficients which belong, it has been developed by Los Alamos National Lab. It's called Open FYI
+[44:47] and it contains a huge set of data for seismic imaging, including Stylwell and Kurbel.
+[44:57] Got it. Okay, so you have it. So you're not actually using different family of functions to
+[45:04] create data, but you already have those input functions. You just plug them in.
+[45:08] And actually, for all the previous examples, we had in-house codes for solving the problem.
+[45:17] So to create, for example, this Kurbel, you're playing with the,
+[45:21] like you have some sort of linear combination of signs or something like that?
+[45:27] I mean, these data sets are already available on the website of the people who created the
+[45:33] data set. So we just took the data from them. Yeah, that's what I'm saying. You take the inputs,
+[45:42] then you run them through a solver. No, no, no. Also, the outputs are already developed by them.
+[45:48] Oh, wow, okay. Yeah, yeah, no, it's huge. Like they have a huge set of data for seismic imaging.
+[45:54] Five times, yeah. Yeah, including input and output. So these ones are given by these
+[46:03] samples of this data set. Same, this one. They have a so-called flat well,
+[46:11] instead of having curvilinear layers, they have linear layers, like flat layers,
+[46:18] even some inclusions in the soil. Like you have some objects and you want to detect this object.
+[46:26] There are many data sets for the seismic imaging, not for the others. For others,
+[46:32] we generate the data. All right, thank you. You're welcome. Okay, so
+[46:43] again, the first numerical experiment consists in testing the architecture on a set of
+[46:48] testing data which are unseen and which share the same discretization for the inputs as the
+[46:57] training. So the training is discretized with L functions and also the testing
+[47:04] inputs are discretized through this exact same number of functions, L.
+[47:11] And here, I mean, we compare the architecture with some other baseline,
+[47:17] including deeponet and fully convolutional neural network.
+[47:20] Neural inverse operator performs slightly better, but for instance, in the trigonometric functions,
+[47:26] visually, there is no much difference between NIO and fully convolutional network.
+[47:30] Similar results also for the Erton-Lang's quantum. NIO performs better, but visually,
+[47:37] also the other architecture performs pretty well. Here, we see some difference and it's where
+[47:45] probably we also get this advantage compared to fully convolutional network. Because in this
+[47:51] case, this is the actual coefficient. This is the coefficient predicted by neural inverse
+[47:57] operator and this is the one predicted by fully convolutional network. And you see that
+[48:03] these architecture completely miss these internal, these inner scatters. And probably that's
+[48:11] what brings the error a bit up higher compared to neural inverse operator.
+[48:17] For optical imaging, again, this is one test sample. This is a second test sample.
+[48:24] We see for this one, visually, similar performance among the models. For this one,
+[48:29] instead, fully convolutional networks a bit underestimate these
+[48:37] height of the scatters. And similarly for Curvell, actually, in this case, fully convolutional
+[48:47] network, which is what this one is actually a pretty powerful architecture used for
+[48:55] seismic imaging, which is called inversion net. And this belongs still, and it's also mentioned in the
+[49:02] paper from OpenFYI, where they have these set of data. They use these inversion net as a model.
+[49:13] And in this case, the performance is comparable for the Curvell family, a bit lower for
+[49:22] fully convolutional network. For Stilvell, again, we observe a slightly better performance of
+[49:29] neural inverse operator. But so the main, the second test that we run is was to test the
+[49:42] performance of the architecture on a set of testing data, which have a different
+[49:51] discretization compared to the training data. So now the training data, again,
+[49:55] consists, the training inputs consist of an operator which is discretized through L
+[50:03] functions. Whereas at testing time, we test through an input with a set of test samples,
+[50:14] so which are still unseen. And also the input operator is discretized through L
+[50:19] till the functions with L till the smaller than L. And now here we plot the median test error versus
+[50:30] the number of functions L till them discretizing the input operator. And you observe that the
+[50:37] blue line is a neural inverse operator, whereas the orange and the red ones are
+[50:42] deponent and fully convolutional network. And we observe that when we test on a
+[50:51] a set or on testing samples, which with the most inputs are discretized in the same way as the
+[51:02] training, then all the model performs fairly well. However, when we move even slightly,
+[51:08] when we consider even a slightly different number of functions discretizing the input
+[51:17] operator, now we observe that the neural inverse operator is pretty stable. It performs
+[51:23] equally well for any type of discretization. Whereas the other two architect, the performance
+[51:29] of the other two architectures deteriorate immediately when we consider a different
+[51:35] number of functions. And the results become even 10 times worse. And we have seen a similar pattern
+[51:45] for the Arthell-Lang's problem for inclusions of the detections. And this proves at least
+[51:51] experimentally, again, we don't have rigorous guarantee. It proves at least experimentally
+[51:56] that the architecture is independent of how many functions we choose to discretize our input
+[52:03] operator. And we observe similar results also for optical imaging, seismic imaging, and so on.
+[52:11] Now one additional experiment is very similar to before. Instead of testing the architecture
+[52:18] on a set of input data defined by L tilde functions with L tilde smaller than L, which was
+[52:29] the training one. Now we test the architecture with a set of test data whose input are discretized by
+[52:36] using L tilde functions between 10 and 100. So less and also more functions compared to what we use
+[52:45] for discretizing the input operator during the training. And you observe very similar behavior.
+[52:52] So this is the typical V-shape pattern that we see when we have this type of non-invariant
+[53:07] discretization of the model. And now what we consider next is the so-called
+[53:19] out-of-sample distribution. Because so far we've always considered a set of testing data
+[53:28] which are unseen during the training, but still belongs to the same distribution of the training
+[53:34] data, which is common practice in machine learning. So if you consider core volume or like
+[53:41] the inclusions of the detections, during the training data we add one to four
+[53:48] scatterers. During the testing inference we also consider a set of testing samples,
+[53:56] including from one to four scatterers. And now what we want to do is to check how the model
+[54:04] performs when you change the underlying distribution of the testing data. So instead
+[54:11] of considering, for instance, scatterers which are squared, we consider scatterers which are
+[54:19] circle and see how the model performs when you change this distribution, when you slightly
+[54:26] perturb or change this distribution. For instance, we consider in the case of the inclusion
+[54:30] detections instead of one to four scatterers, five scatterers, and then the model has never
+[54:38] seen five scatterers. And the performance is still pretty good. And similarly, instead of
+[54:46] considering one to four scatterers with the same shape, we consider one to four scatterers with
+[54:52] different shapes. And also in this case, the performance remains pretty good. Of course the
+[54:56] deteriorates because those are completely unseen out of distribution samples, but still the model
+[55:02] performs very well. And also for the art and lungs, instead of defining the training, the
+[55:08] testing data by perturbing a reference solution by 8 percent noise, we perturbed by 12 percent
+[55:15] noise. And in this case, the performance is exactly the same. And this is actually
+[55:22] quite surprising because, as I mentioned initially, the inverse map is stable, but still is weakly
+[55:30] stable. And actually people in the field of inverse problems almost consider
+[55:38] this type of weak logarithmic stability almost equivalent to no stability at all. So it was
+[55:46] quite surprising to see that despite the nature of the map, also by changing the underlying
+[55:52] distribution, the model was performing fairly well without providing completely random prediction.
+[55:58] And again, we don't have a reason why this happens, but the heuristic is that
+[56:04] by training the model, you kind of enforce some stronger form of stability
+[56:14] of the architecture itself because you kind of restrict the functions that the model can
+[56:21] return to a specific class of functions. You will not get, by training the model on scatterers,
+[56:28] something which looks like the art and line spontane, because of course the model has been
+[56:34] trained on the specific task. And one additional example was ablation study. We wanted to see how
+[56:50] additional free layers and randomized patch impacts on the performance of the model because
+[56:59] after all, it might have also not brought to any improvement. And what we observe here is
+[57:08] the blue line is neural inverse operator with the Fourier layers and the randomized patch
+[57:15] algorithm. The purple one is a neural inverse operator without the randomized patch.
+[57:21] And the light blue is a neural inverse operator without the Fourier layers.
+[57:26] And you observe that for all the experiments, if we include both the Fourier layers
+[57:34] and the randomized patch, the model performs way better compared to not having either one
+[57:41] or the other. And this is for different discretization of the input testing operator.
+[57:50] So to conclude, because my initial claim was, okay, we tried to approximate the underlying map
+[57:58] because the actual inverse problem, solving the actual inverse problem with traditional
+[58:03] numerical methods is very expensive. Is this actually true? So what we did was to compare
+[58:10] the performance of the model with the performance achieved with the traditional
+[58:14] numerical methods. And you can see this one is the Arten Lang coefficient reconstructed through
+[58:21] a traditional scheme is way more blurred compared to what the model reconstructs. And also
+[58:32] the computational time for obtaining these is around two hours. Whereas the inference time,
+[58:39] only the inference time for a neural inverse operator is 0.1 second. And this is actually not
+[58:47] a property only of NIO, but all machine learning models perform equally well in terms of computational
+[58:54] time as the as neural inverse operator. So it's more like, if we can use machine learning
+[59:03] to actually solve this inverse problem in lower computational time. We did the same also for
+[59:12] the inclusions of the detections. And I would like to highlight that this sample is an out-of-distribution
+[59:21] sample because remember the training data we trained the model with was defined by
+[59:27] a sculptors of all the same shape. Instead here we consider a set of sculptors with different shape.
+[59:34] And you can observe that NIO, even on these samples, which is smaller and never seen,
+[59:42] it kind of sees that there is something going on and it provides some more blurred around the
+[59:49] object. Whereas it captures very well the edges of these two because these are
+[59:55] similar size of the one that the model has seen. And again, this one, two percent error in 0.5 second,
+[60:02] whereas with PD constraint optimization took 30 minutes for with a 10 percent error. Similar results
+[60:11] also for seismic imaging. So where do we stand and actually where we would like to go? So
+[60:22] as you have probably noticed, we don't have at the moment any mathematical guarantee.
+[60:27] And what we would be nice is to construct an upper bound on the error of a neural inverse operator
+[60:33] and to see how the discretization of the input operator impacts on the performance, how other
+[60:42] features impact, for instance, on the error. And also, one additional thing that we would like to
+[60:55] work on is to improve the generalization performance of the model on these out-of-sample
+[61:03] distribution. And so I think I would like now to stop and thank you very much for your attention.
+[61:15] Thank you, Roberto. And if you have any questions, I would be happy to answer.
+[61:23] Okay, so that's sweet. Do we have questions for Roberto?
+[61:32] I feel like I've asked a lot, but I do.
+[61:39] So I was wondering, can you go back a couple of flights to the images you showed of the
+[61:45] different shapes of these one? Yes, exactly. So I'm looking at this and I'm thinking,
+[61:53] so your scatterers are like blobs with one like high intensity point in the middle, right?
+[62:03] Yes. So in terms of application of this study, do you really need this whole,
+[62:12] like to reconstruct the whole image? The prediction should be a reconstruction of the whole thing?
+[62:17] Or would, for example, just trying to figure out the location of the three scatterers,
+[62:24] like X, Y coordinates? It depends on the application and also, I mean...
+[62:34] Yeah, that's what I'm interested in, like in terms of application.
+[62:38] I think in medical imaging, you would like to reconstruct the entire image.
+[62:42] And also because if you, so let's say, one way is also, as you mentioned,
+[62:49] is to predict where they are located. However, in this case, you are assuming that you know
+[62:55] how the coefficients look like. So when it comes to then coefficients where might have different
+[63:05] form from what you guessed, then you would have no idea how to actually reconstruct the
+[63:14] coefficient. You see what I mean? Instead, in this case, it's completely unparametric,
+[63:22] because it just reconstruct the image without any type of assumption on how the image
+[63:32] should look like, any parameterization. You are not predicting the size of the scatterers
+[63:38] and the location of the scatterers. So if you're given a different task, maybe you have
+[63:45] I don't know, you want to predict also the shape, then you wouldn't be able to do it if you
+[63:51] constrain yourself to a given parameterization of the state that you are looking for.
+[64:01] I agree. That leads me to the next question, which is how robust it is to the geometries.
+[64:08] How good, if you have a non-convex geometry or some crazy star-shaped geometry,
+[64:16] will you be able to pick up those? We don't know yet, but that's what we are
+[64:21] working on at the moment. Actually, yes. Thank you. You're welcome.
+[64:27] I think Professor Erhard has some questions until you. Yeah, we can hear you now.
+[64:39] Okay. Yeah, thanks for this very nice talk. I have maybe a more fundamental question.
+[64:47] I was wondering if your approach is somehow independent of the type of PDE.
+[64:56] You have three different types of PDEs, but somehow you didn't dive into the details.
+[65:03] I mean, if you think about stability estimates, then the stability estimates are very different
+[65:10] for each type of PDE. Is a method really independent of the type?
+[65:15] No, no, no. We train each model for each benchmark and for each PDE. The models are
+[65:26] agnostic with respect to the physics. If your underlying problem is governed by
+[65:33] radiative equation and then you apply a model which has been trained, let's say, on data generated
+[65:38] by solving Poisson equation, there is no hope that the model is going to provide you reasonable
+[65:46] inaccurate reconstruction unless you incorporate in the model itself, either with the
+[65:51] architecture or the loss, some information about the PDE itself. But this is a completely data-driven
+[66:00] model. So the model sees at the moment completely agnostic of the physics, and it sees an input
+[66:08] and returns an output, no matter what is the PDE, the underlying PDE. Of course, if the
+[66:13] underlying PDE is different compared to what you are trained on, then the model performance
+[66:19] are going to be terrible. Yeah, and maybe one small extra question. Maybe I missed it.
+[66:27] Do you need the knowledge of the fundamental solution of the PDEs, or are you computing the
+[66:32] fundamental solutions? No, no, no. We are not computing fundamental solutions. We are not
+[66:37] computing green functions. We simply have a code which solves the underlying PDE. What we
+[66:43] do is to assign the boundary data, solve the underlying PDE, and obtain the corresponding
+[66:48] observable, given the problem at hand. So again, for the Poisson equation, we assign the voltage,
+[66:54] we compute current, but we don't assume anything about green functions, fundamental solutions,
+[66:59] or anything. Okay, thanks a lot. I've got a question. I'm Sukho again from Davis.
+[67:08] So you mentioned about the problem being ill posed. So from the boundary data, you can get
+[67:13] different realizations of A of x, y, right? So is it possible that for a given solution,
+[67:22] you can construct actually two functions A of x, y, which give the same solution, boundary data?
+[67:31] I see what, okay, so I should have been probably more clear. The problem is ill posed when you
+[67:38] consider a single set of measurements. So again, if you, or very few measurements, if we go back
+[67:48] here. So if you, if you consider the EIT, you compute the intensity of the current for one
+[67:57] single realization of the boundary condition, and then given these single measurements,
+[68:03] you try to infer the coefficient, then the problem is ill posed. But when you set it
+[68:08] in the framework of operators to function, or namely, if you collect many different
+[68:15] realizations of the intensity of the current, each obtained by different realization of these
+[68:21] voltage, then the problem is stable, even though it's a weakly stable.
+[68:28] Yeah, that's right, because you were showing many exact coefficients, then comparing to what
+[68:32] you obtained, right? So then that's what was not clear. Okay, also the second question is
+[68:37] many other questions that people are asking. So if you just have a triangular domain instead of,
+[68:41] say, a square or a circle, can you still do what you're doing by just mapping the
+[68:46] triangle to a square and proceeding or? Okay, so the main reason why we used
+[68:56] why we used Cartesian and square domains is that we used these Fourier layers.
+[69:05] And in Fourier layers, what it is done is to compute the Fourier transform of the input,
+[69:12] then to multiply by some learnable parameters and then compute the inverse Fourier transform.
+[69:17] And these Fourier transforms is computed with the FFT algorithm. And to use FFT, you need to
+[69:24] have Cartesian domains. So the way you can, so one way to do it, if you have like triangular
+[69:34] domain, so what you can do is you consider, and that can be everything, that can be a
+[69:41] discrete version of the triangular domain, some just sample, pick that random, then you do everything
+[69:47] exactly, you do the same with that we did before up to this point here. And now,
+[69:56] what one can do in order to still be able to use FNO or like these Fourier layers is to
+[70:02] include an additional transformation which maps this triangular domain into a square domain,
+[70:09] do all the reconstruction and then map back to the triangular domain to obtain the coefficient
+[70:15] on triangular domain or replace directly these Fourier layers. Yeah, I was asking because, you know,
+[70:23] whenever you construct a map from a triangle to a square, of course, the Jacobin will vanish
+[70:28] at one point, right? So that does cause an issue because if you can do that, then
+[70:33] in potentially I think you could even do unstructured, you know, domains, right?
+[70:37] I mean, the authors of the paper of FNO also proposed these geo FNO, which does exactly this.
+[70:46] And they even mapped airfoil domain to Cartesian domain, which are not topologically
+[70:57] the same equivalent. And they got some reasonable results. I don't know mathematically if, I mean,
+[71:04] in practice, it should be doable. I don't know if it makes completely sense from a rigorous
+[71:11] mathematical perspective. That's, that's, I don't know. Because I don't know what will happen
+[71:15] to the Fourier coefficients when you have, you know, when the Jacobin is not, you know,
+[71:19] I mean, because I wouldn't know. I wouldn't know. Actually, I'm not able to answer on top of my
+[71:27] ad like this question. I had no idea. Also, because in the end, like the parameters, I mean,
+[71:33] you still compute these coefficients, but then you multiply them by these learnable
+[71:38] parameters that you learn during training. So it's very difficult to say what's going to
+[71:44] happen. Because when, you know, when it comes to training and machine learning, everything is
+[71:50] very sure. So thanks.
+[71:55] Some data. Who proposed GFNO?
+[72:00] No, we proposed it in the deep one. Exactly. It's in our paper. We proposed it before the
+[72:08] GFNO is in the paper, fair comparison of 16 different benchmarks. So we could do it with
+[72:18] both the DFNO for dimension consistency and also the geometry. We try to help them.
+[72:28] Okay. All right. That came before I see it. I was wondering if Umair,
+[72:35] are you in the audience? Umair may have a question, but okay, no.
+[72:50] Good discussions from that. Maybe we can go to the next one. Very, very good discussion.
+[72:53] Robert, thank you for the nice talk. Thank you. It was very a great pleasure.
+[73:00] You can speak up for our second talk, actually, Alberto. Okay. Thank you. Maybe
+[73:08] you can stop sharing, maybe? Yes. It's all European today.
+[73:13] It's nice. It's nice. I like it. Thanks again.

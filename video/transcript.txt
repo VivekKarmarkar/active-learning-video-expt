@@ -1,0 +1,1209 @@
+Welcome to this week's Cran seminar. Our first speaker today is Roberto Molinaro.
+He's studying, he's currently a PhD student with Professor Siddharth Mishra and he has
+completed his master's degree at ETA at Zurich in the Department of Mechanical Engineering. His
+research focuses on scientific machine learning, specifically on applying physics-informed neural
+networks for forward and inverse problems. In particular, he's interested in high-dimensional
+PDEs and exploring how PINs can improve the resolution of such equations. Recently, he has
+also ventured into the field of operator learning and its potential applications for
+learning operators for the underlying PDEs. With that, please join me in welcoming him
+for today's presentation. You may want to take it away. Thanks a lot for your kind introduction
+and also thank you very much for inviting me. It's a really pleasure and so what I'm going
+to talk about today is neural inverse operators for solving PDE inverse problems, but before
+delving into it, I would like to acknowledge the people I work with, particularly Yunan Bjorn
+and my supervisor Sidd, that probably many of you know, and I would like to spend
+a couple of minutes talking about inverse problems and what means solving inverse problems.
+So let's consider a generic forward operator, F, which can be linear or nonlinear,
+between two different normal spaces. And now solving an inverse problem
+consists in finding if exists a state A such that F of A is equal to U, where U is the observable,
+so what we actually measure. And given the measurements of U, we would like to infer
+the underlying state A. And for instance, in the context of partial differential equation,
+the forward operator might be the operator which takes as input the coefficient of the
+coefficient in the partial differential equation and returns the solution of the PDE. For instance,
+in the case of the ETH equation, the forward operator can be the operator which takes as input
+the diffusivity A and returns the solution U which corresponds to the temperature of the
+medium. And then the inverse problem might be, for instance, given measurements of the
+temperature U, infer the underlying conductivity of the medium. And the main question that
+naturalizes when solving inverse problem is can we actually reconstruct in a stable way
+the underlying coefficient A? Or in other words, if we are given two observables
+which are very close to each other, let's say U and U prime, this is also true that the
+corresponding states A and A prime are also close to each other. And this is known as stability
+of the inverse problem. And unfortunately, the bad news is that most inverse problems are
+ill-posed. So this means that even though two observables are very close to each other,
+the corresponding states can be very, very different. And this is what makes inverse
+problems ill-posed. And now I would like to give you some examples of inverse problems.
+The first one is electrical impedance homography. This is widely used in the medical field.
+And what is done is to apply a voltage at a given point on the boundary of the object.
+This voltage triggers a current inside the body. And then the corresponding
+intensity of the current is measured at the boundary of the object. And now given the
+measurements of the intensity of the current at the boundary of the object,
+one wants to infer the internal structure of the object.
+And in mathematical terms, this problem is modelled through the Poisson equation,
+where the interior structure of the object is described through the conductivity of the medium.
+And then the inverse problem consists in finding the conductivity A, given measurements of the
+intensity of the current at the boundary, where the intensity of the current is nothing but
+the normal trace of the solution at the boundary. A similar example is optical imaging.
+And the difference with respect to, compared to the electrical impedance homography,
+is that in this case, the scan is done through light. And despite the similarity,
+the mathematical model describing this phenomenon is completely different,
+because here we have the radiative transport equation. And the inverse problem consists in
+finding the so-called scattering coefficient, given the measurements of the intensity of the radiation,
+which leaves the domain. But the main goal is the same. Given measurements of the solution
+or measurements of the observable at the boundary, infer the internal structure of the
+object, which can be modelled through the conductivity of the medium, if we are talking
+about electrical impedance homography, or the scattering coefficient, if we are talking about
+optical imaging. But the idea is the same. And one similar example is also seismic imaging.
+And what is done is to send some waves in the ground from a source, which is located at the
+top surface of the ground. These waves are reflected through different layers of the soil.
+And the corresponding pressure variation due to these reflected waves is measured at some
+receivers, which are again located at the top surface of the domain. And the inverse problem is
+to infer the velocity of the wave, which is a direct measure of the internal property of the
+object, given the measurements of the pressure variation at these receivers. So all these
+problems share a similar structure. For all these problems, we aim at reconstructing the
+interior properties of the object, given measurements which are taken only at the boundary.
+And the main issue of solving this problem is that measurements of the observable,
+which arise for a single instance of the boundary data, do not suffice to infer the underlying
+coefficient that we are looking for. So to make it more clear, if we go back to the example
+of the electrical impedance homography, if we set the voltage potential at this point,
+we measure the corresponding intensity of the current. And then given these measurements,
+which are realized for one single realization of the voltage, and we try to infer the conductivity
+even given these single measurements, then there is no hope to stably reconstruct the
+underlying coefficient. And actually what is done for when solving these type of problems
+is to first apply a voltage potential at this point on the boundary of the domain
+and measure the corresponding intensity of the current, let's say psi one.
+Then move the source on another point of the boundary of the domain and obtain the corresponding
+intensity of the current and keep doing these several times until we cover the entire
+boundary of the object through these sources here. And now, given the collections of the
+measurements psi one, psi two, psi three, psi four, and so on, each of them obtained by different
+realizations of the boundary data G1, G2, G3, we try to reconstruct the coefficient. And now
+in this case, we can reconstruct the coefficient in a stable way. In more rigorous terms, for all these
+problems, the observable is actually an operator, in particular a boundary operator, namely an
+operator which takes as input a function which is defined on the boundary of the domain
+and returns a function which is still defined on the boundary of the domain. And now if we consider
+the map, which takes as input this operator and returns the underlying coefficient that we are
+interested in, then this map is unique and weakly stable. So
+now this boundary operator lambda a is different for any of these problems and it depends on the
+structure of the partial differential equation. But the idea is exactly the same. For all these
+problems, we can construct this map which takes as input this operator and returns the
+underlying coefficient. For instance, in the case of the EIT, the boundary operator is the Dirichlet
+to Noman map. For the optical imaging is the so-called Albedo operator, the operator which
+takes as input the radiation which enters the domain and returns the radiation which leaves
+the domain. And for the seismic imaging, we have the source to receiver map. So again, for all
+these problems, share a similar structure. And for all these problems, the map which takes as
+input a boundary operator, which can be different based on the nature of the PDE and returns the
+coefficient of interest, this map is well posed, is at least unique and stable.
+And the main issue of solving these inverse problems is that they are
+very computationally expensive. And therefore, what we aim to do is to replace these
+inverse maps with a surrogate deep learning data-driven model. But in order to construct
+this data-driven model, we need two main building pieces, namely a data and a model.
+So before going on, is there any question at this point? So we are addressing a class of
+inverse problems where the map from operator to functions, in particular a boundary operator to
+function is well posed. And now what we are trying to do is to approximate these inverse map
+through data-driven model. What we are going to do now is to specify how the data and the model
+should look like or might look like for this type of supervised learning model task.
+Roberto, this is Sukou from Davis. I had just had a question on the previous slide
+when you when you impose essential boundary conditions at two points.
+You mean here? Yeah, exactly. So what were the boundary conditions for the remaining part
+of the boundary? Is it zero flux or something? You can imagine a point source boundary conditions.
+Actually, when we run the experiments, for instance, we use some kind of
+wave type boundary conditions which are defined on the entire boundary of the domain. And these
+are usually Dirichlet boundary conditions, at least the electrical impedance tomography.
+Yeah, exactly. Yes. So you can imagine that it's, they say one at this point and zero
+everywhere else. So just a function. Like a hat function, like a hat function, right?
+Yes, for instance, but this can be kind of arbitrary. And maybe it's going to get clear
+also once I talk about the data structure. Yeah, okay, thanks. Yeah, sure. You're welcome.
+Feel free to interrupt me at any point if you have any question. Okay.
+Claudia, I can ask one more question quickly. Can you can you impose
+flux, like zero flux boundary conditions and knock off the constant, which is the null space
+by the average, because the average is going to be some number, right? So is it possible to do that?
+Actually, also for this problem, also the Neumann to Dirichlet map, if you consider the operator
+which takes as input the Neumann data and returns the Dirichlet data, and the inverse map which
+takes this operator as input and returns the coefficient, this is also well posed. So you
+can also impose the as you can also impose a flux function. Absolutely, yes.
+I was thinking about the DTN map, basically. That's why. Yes, absolutely. You can consider
+either the DTN map or the NTD map. Actually, NTD is even better because it's more stable than the DTN.
+Okay, so data. First, the essential first, the first point is how to discretize this
+input operator, because now again, we are trying to solve the supervised learning task where the
+input to the map to the map is an operator. And actually, from what I told before,
+this should be already kind of clear. So one way of discretizing this operator is to consider the
+tuple of input and output functions, g1, psi1, g2, psi2, g3, psi3, and so on. And those are nothing
+but realizations or samples from the underlying operator. So you apply a given boundary data g1,
+you can obtain the corresponding observable psi1, which is nothing but the action
+of the underlying operator on the corresponding boundary data. And then you repeat this process
+at times. And now our discretized version of our input operator is this
+collection of input and output functions, where again, the output functions are nothing but the
+actions of the operator on the input functions. And now if we assume that the operator is
+injective, we can kind of forget about the inputs. And we can only consider as a potential
+representation of the discrete operator, just the collections of these output measurements, psi1,
+l. So we have l, which is actually also pretty consistent with what is done in practice. Because
+again, in practice, what you do is just to measure the observable and then given the
+measurements of the observable inferred the underlying coefficient. But now,
+instead of having one measurements of the observable, we have l different measurements
+of the observable, each realized by different, for instance, locations of the boundary data.
+And now we move to the actual generation of the training data. So what we do,
+because of course, the training of the model is done through synthetic data. So we generate
+ourselves the data in order to learn the underlying map. And what we do is to fix a given distribution
+over or probability distribution over the input functions g. And we use the same,
+and we draw from this distribution l different functions gl. And we fix them. So now we consider
+an additional distribution nu a on the coefficients. And we draw a random coefficient
+from this distribution. And now for each of these realizations of the Dirichlet data,
+we solve the underlying partial differential equation, which is in this case is the Darcy
+equation with the coefficient a and with boundary conditions g1, g2, g3, and so on.
+And then we compute the corresponding observables. In this case, the Neumann trace of the solution.
+And again, this operator simply arises from the nature of the partial differential equation.
+So we don't know exactly how to compute this, but this again comes from solving the PDE.
+And now the tuple of l input, l measurements psi l and coefficient a define one single
+data sample. And of course, now we can repeat this process with the same realizations of
+boundary data gel for n different realizations of the coefficients a. And then we put them
+together in order to construct the training data. So this is how the training data looks
+like. We have n samples defined by input obtained as a collection of l functions and output,
+which is a single function, the coefficient of interest. Okay, so is this clear? Because now
+we are going to move to the model part based on this construction of the data.
+Yeah. So one quick question. This is Dar from Brown. How are you solving the forward part,
+like you're using some runicuta? No, because this is a time independent problem. So we just
+use a linear solver. Oh, you solve directly? Yeah, we solve it directly in order to generate
+these training data. So these data are synthetically generated. So again, we consider
+differentizations of the boundary data. We draw a random different coefficients.
+For each of them, we solve the problems. And then we assemble these data. But the PDE is
+solved numerically by finite differences, finite elements, standard numerical methods.
+Oh, I was asking, because the follow up question would be, what's the order of that
+question? Because you have a lot of surface waves and a lot of phenomenons
+that you will get only if you solve it high order. And then your
+finite differences of finite elements have to be high order.
+No, actually, we use a second order finite differences to solve these problems.
+We don't have extremely high frequencies for the boundary data.
+Okay. Cool. Thank you. You're welcome. Can I ask you a question also? This is
+from Sandhya National Labs. Can you comment on whether you imagine in the future that you would
+want to generalize to different geometries? So right here, you're working with the
+coefficients. But are you envisioning that as an extension in the future?
+Yes. I mean, of course, it can be extended. Because after all, so for the time being,
+okay, so this is still the, let's say, the continuous version of the problem,
+at least in terms of functions. Because now we have discretized the input operator,
+but still these psi L and these A are functions. And this can be defined on any arbitrary domain.
+The main issue is then on a discrete level, how to represent these functions.
+And so far, we have considered only the case of Cartesian grid points or
+let's say points on a circular domain. But also in that case, you can kind of
+simplify to Cartesian set of points in polar coordinates. But of course, then you can apply
+any type of data transformation prior. You can kind of discretize these functions
+on a set of points that you wish. Then the only thing that matters is how you build the
+underlying model. Because each model can deal with different data structures in terms of where you
+discretize the functions. So in principle, you can discretize it everywhere. And it doesn't
+matter if it's a square, a circular domain, complex domain. But then of course, you have to adopt the
+architecture in order to deal with this type of data. But yeah, I mean, there is a potential
+application to also other different domains. Understood. Thanks. You're welcome. Okay.
+So actually, also according to what I was saying before now, when it comes to the construction
+of the model, the learning model has to be consistent or has to respect the inherent
+properties of the problem or the task at hand. And in particular, what are the main properties
+that we would like the approximate model to satisfy? So first of all, the model that we
+are trying to approximate or to construct is a model which takes functions which are defined
+on the input and returns functions which are defined on the boundary and returns
+functions which are defined in the interior domain. So boundary to interior. And now
+second and more important point, this inverse map is a map from operators to functions. And so
+what does it mean? I mean, what does it imply? First of all, we would like that at testing time,
+the model should be able to handle any arbitrary number of functions L tilde,
+discretizing the input operator. No matter if we have L functions, 2L functions,
+M functions, we would like the model to be able to handle without retraining any arbitrary number
+of functions. And we'd like the model performance also to be independent of how many functions we
+chose to discretize our input operator. Or in other words, we would like the model to be
+independent of how we discretized input operator. And that's because of course,
+if we imagine to deploy this model for
+usage later on, then we might have given inputs, let's say measurements of the given observables,
+which are taken not in the exact same way we generate is the training data. Maybe we generated
+the training data by using 10 functions. And then we receive, we are asked to compute
+the underlying coefficient at inference for maybe 10 measurements because the prediction has taken
+10 measurements. And we would like the model to be independent of how many functions, how many
+measurements are taken. And so before delving into the specific architecture,
+a little overview about the so-called operator learning framework that probably many of you
+are already familiar with. So operator learning consists in functions to function map
+approximation. And here we are doing some things that are different because now we are trying
+to approximate operators to functions map. And there are many wide-use architectures.
+One very common architecture is DIPONET. So DIPONET belongs to the class of operator networks
+and it approximates the output function as a linear combination of some basis functions
+tau with the given coefficients beta, where the basis functions tau depend only on the set
+of points where we would like to evaluate our output function, whereas the coefficients depend
+only on the input function f. And it's standard practice to approximate both the branch
+and the trunk, sorry, the coefficients of this function and the basis of these functions
+with neural networks. And we call the branch net, the network approximating the coefficient
+and trunk net, the network approximating the basis. And a nice property of DIPONET is that
+it can approximate functions, input and output function, let's say operators between functions
+which are defined on any arbitrary domain. So the domain definition of the input function f
+and the output function h can be completely different. And this is actually a very
+useful property for our purpose. However DIPONET, as I mentioned before,
+it approximates operators, namely maps between functions and functions. So we need to modify
+we need to modify a bit the architecture in order to be useful for our case.
+One additional architecture which is very used nowadays is Fourier Neural Operator.
+And this consists of the composition of different operators. First, the input function is lifted
+to do to an i-dimensional space through a linear transformation R. And then the output of
+this transformation is passed through a set of Fourier layers. And finally it's projected
+back to the original space through the projection Q. Actually the details of the
+architectures are not relevant for the purpose of this presentation. But the main take home messages
+concerning FNO is that this architecture, differently from DIPONET, is based on a non-linear
+reconstruction. And therefore it can be very expressive, in particular when it comes to
+discontinuous functions. And for our purpose we might end up dealing with the discontinuous
+functions. For instance, if you imagine again the composition of the soil or the ground,
+this can be given by different layers which can be represented by discontinuous functions.
+So we would like to have some expressive power when it comes to discontinuous functions.
+However, FNO can only approximate operators between functions which are defined on the same
+domain, at least the plain vanilla version of FNO. And also, like DIPONET, FNO approximates operator.
+So again, it's not completely useful for our purpose. So the architecture that we propose
+is called neural inverse operator. And now, based on the main properties that we would like the model
+to show, I will build up on these points, different elements of the architecture.
+So first of all, in order to address the first point, namely input and output which are
+defined on different domains, while still keeping the expressive power of FNO,
+we combine together DIPONET and FNO. So what you observe here, this one is the branch net of
+DIPONET. And this is the trunk net of DIPONET. And then we have a set of three layers here.
+So the branch net takes as input the collections of the L functions. So this is one single
+data sample. And it constructs the coefficients of the linear expansion of DIPONET.
+The trunk net takes as input the variable set, which corresponds to a discrete version of the
+interior domain. So in this case, just Cartesian grid points discretizing the
+interior domain. So again, these functions are defined on the boundary, whereas Z is a
+discrete representation of the interior domain. And the trunk net returns the basis of this
+expansion. And now these weights and basis are assembled together in order to construct these
+L different functions, which are now defined in the interior domain. So DIPONET moved
+the reconstruct from the boundary data some latent variable, which is defined in the
+interior domain. And now these set of functions are passed through the linear transformation R,
+which returns the variable, again, a second latent variable H,
+which is then processed through a set of different Fourier layer. And now you can
+see here how this function, this function, this operation looks like. This is simply a weighted
+average of these functions f of L, each of its own weight, WL. And now what you can imagine
+this architecture doing is first DIPONET tries to construct the solution of the partial
+differential equation inside the domain, given the measurements taken at the boundary of the domain.
+And then what the Fourier layers and, you know, like this part of the architecture does
+is to perform the inversion, given the solution of the PDE in the domain, obtain the corresponding
+underlying coefficient. And the main issue of the architecture as it is right now
+is that this architecture, despite being able to approximate, despite being able to handle inputs
+and outputs which are defined on different domains, still we have the problem that at testing time,
+if we are given L plus one function, we wouldn't know what to do with the last functions. Maybe
+we assign to the first L the parameters WL. And then what do we do with the last one?
+We said maybe the parameters equal to zero is not clear and it's not
+extremely rigorous. So what we did in order to make the architecture able to handle any
+discretization of the input operator at testing time is to replace these
+weighted average through a simple empirical expectation. So we assign basically the same
+weight to all these functions F of L. And now at testing time, if we're given a different
+number of functions L tilde discretizing the input operator, what we need to do at this point
+is just to compute the empirical expectation of these functions F of L. So this solves the
+second point to A. So now we are able to handle at testing time any arbitrary number of functions.
+However, as this stands now, we have no guarantee that the architecture will perform
+equally well when we consider different number of functions. And the main objection
+that one can do is that now we're kind of losing information because we are replacing
+a weighted average with a global average where we are assigning the same weight to every function.
+So somehow we lose some information. And the way we solve this problem is through
+a so-called randomized batch. So this is an algorithmic trick. And what we do, so
+and it works in this way.
+What we do, so this is how our training input looks like. We have again a collection of L
+functions. In this case, we have nine functions. So what we do at every training iteration
+is to draw at random an integer number between one and nine. And then we draw from this box of
+functions, let's say L at functions where L at can be anything between one and nine.
+And then we feed the model with these collection of functions. And now there is no problem
+with feeding the model with this input because of how we built the architecture in the
+previous step. And then we repeat this process at every training iteration. So not at every epoch,
+but really at every time we call the model, we draw at random a different number of functions
+from this box. And then we feed the model with this new number of functions. So iteration one,
+we have five functions, iteration two, we have nine functions, iteration nine, we have two, and so on.
+And now first we don't have any smiling face here because unfortunately we don't have guarantees
+about the mathematical guarantees about this algorithm. So we can only test the
+effectiveness of the model through numerical experiments. But the heuristic is that,
+so if we consider this architecture, and if we imagine there exists a distribution over these
+functions f of L, which are the functions which the PONAT reconstructs, what you observe with the
+first architecture is always and only the empirical expectation of these functions.
+Instead, when you construct these sub batches of the training inputs,
+the model is able to explore the entire probability distribution because maybe at some point you get
+two samples with two samples, you get a very bad estimate of the empirical expectation which
+maybe is located at the very end tail of the distribution. And then by repeating this
+process n times with n being very, very large, somehow the model observes the entire distribution
+over these functions. And so this is how you recover the information that you lose by replacing
+these weighted average with this global average. One additional way to perform this task,
+maybe instead of providing as input to the Fourier layers only the empirical expectation,
+you compute different statistics of this distribution. You take the mean, the standard
+deviation, the minimum, the maximum and so on. And then you provide as input to these Fourier
+layers all these statistics. This randomized batch is just a more efficient way of doing this
+in order to explore this distribution. Excuse me, can I ask a question? I'm Kamal from Brown.
+Is the same model the Fourier depunit? I put the paper inside. Is it the same model?
+I'm aware of this. I think I'm aware of this paper. The initial architecture is the same.
+Yes. What they do is to combine depunit and Fourier. I think figure three.
+Yeah. I think this is this architecture here, but they came after this one.
+Okay. So this came before the other one? Yeah. This one came in already January.
+But the architecture is same. What they do is to construct, is to combine depunit and FNO.
+I think they also use some U or net principle here at these Fourier layers.
+But yeah. It looks like similar. So that's how I ask the question. Is it?
+Yeah. It's totally legit. And yes, I mean the basic architecture is the same. Yeah.
+Okay. Thank you. Oh, it's very similar. Yeah. Thank you. You're welcome.
+And is there any question concerning the model? Okay. So then we can
+look at some numerical experiments. So we consider different benchmarks for the
+electrical impedance homography. We consider a set of data whose coefficients, which we are trying to
+infer, look like this, like similar to trigonometric functions. We have different frequencies
+up to seven, each with different amplitude and so on. And this is how the input operator looks
+like or at least three discrete samples of this input operator. Second example we consider for the
+EIT is one of ART and LANGSA. And the coefficients look like this. Actually, the dataset is obtained
+by perturbing this reference configuration with adding some noise and then solving the underlying
+problem again with finite elements. And this is a very simplified model even though it's widely used
+of human body midsections. These ones are the LANGSA and this one is the heart of humans. And
+this is how again the input looks like. Third example, detection of inclusions. We have
+scutters from one to four which are spread in the domain. And these scutters are all the same shape.
+And what we try to reconstruct is where these scutters are located and how they look like.
+For the optical imaging, we consider a similar example to the one before, but in 1D. And now
+we consider different coefficients by varying the height of these scutters, the width, the location,
+and so on. But as for seismic imaging, we consider the problem of the family of
+coefficients belonging to the Kurbel family, just some Kurbel linear layer. That's what
+I meant by discontinuous functions. You can see some discontinuities between different layers
+and the Stylwell family coefficient. So the first experiment that we, the first test that we run
+is to compute the performance on a testing set whose input are discretized in exactly the
+same way as the training. Can I roll back? I just want to understand what do you mean by
+family of coefficients, like the Stylwell Kurbel? What are those? Just like you change?
+Yeah, so this is one sample from this family. And then you can have, maybe I have here one
+additional sample. You see, this is a second example for a second sample. So you can have
+the samples belonging to the family all share a similar property, which is these Kurbel linear
+layers corresponding to different layers of the ground. But it's just like a family of
+coefficients which belong, it has been developed by Los Alamos National Lab. It's called Open FYI
+and it contains a huge set of data for seismic imaging, including Stylwell and Kurbel.
+Got it. Okay, so you have it. So you're not actually using different family of functions to
+create data, but you already have those input functions. You just plug them in.
+And actually, for all the previous examples, we had in-house codes for solving the problem.
+So to create, for example, this Kurbel, you're playing with the,
+like you have some sort of linear combination of signs or something like that?
+I mean, these data sets are already available on the website of the people who created the
+data set. So we just took the data from them. Yeah, that's what I'm saying. You take the inputs,
+then you run them through a solver. No, no, no. Also, the outputs are already developed by them.
+Oh, wow, okay. Yeah, yeah, no, it's huge. Like they have a huge set of data for seismic imaging.
+Five times, yeah. Yeah, including input and output. So these ones are given by these
+samples of this data set. Same, this one. They have a so-called flat well,
+instead of having curvilinear layers, they have linear layers, like flat layers,
+even some inclusions in the soil. Like you have some objects and you want to detect this object.
+There are many data sets for the seismic imaging, not for the others. For others,
+we generate the data. All right, thank you. You're welcome. Okay, so
+again, the first numerical experiment consists in testing the architecture on a set of
+testing data which are unseen and which share the same discretization for the inputs as the
+training. So the training is discretized with L functions and also the testing
+inputs are discretized through this exact same number of functions, L.
+And here, I mean, we compare the architecture with some other baseline,
+including deeponet and fully convolutional neural network.
+Neural inverse operator performs slightly better, but for instance, in the trigonometric functions,
+visually, there is no much difference between NIO and fully convolutional network.
+Similar results also for the Erton-Lang's quantum. NIO performs better, but visually,
+also the other architecture performs pretty well. Here, we see some difference and it's where
+probably we also get this advantage compared to fully convolutional network. Because in this
+case, this is the actual coefficient. This is the coefficient predicted by neural inverse
+operator and this is the one predicted by fully convolutional network. And you see that
+these architecture completely miss these internal, these inner scatters. And probably that's
+what brings the error a bit up higher compared to neural inverse operator.
+For optical imaging, again, this is one test sample. This is a second test sample.
+We see for this one, visually, similar performance among the models. For this one,
+instead, fully convolutional networks a bit underestimate these
+height of the scatters. And similarly for Curvell, actually, in this case, fully convolutional
+network, which is what this one is actually a pretty powerful architecture used for
+seismic imaging, which is called inversion net. And this belongs still, and it's also mentioned in the
+paper from OpenFYI, where they have these set of data. They use these inversion net as a model.
+And in this case, the performance is comparable for the Curvell family, a bit lower for
+fully convolutional network. For Stilvell, again, we observe a slightly better performance of
+neural inverse operator. But so the main, the second test that we run is was to test the
+performance of the architecture on a set of testing data, which have a different
+discretization compared to the training data. So now the training data, again,
+consists, the training inputs consist of an operator which is discretized through L
+functions. Whereas at testing time, we test through an input with a set of test samples,
+so which are still unseen. And also the input operator is discretized through L
+till the functions with L till the smaller than L. And now here we plot the median test error versus
+the number of functions L till them discretizing the input operator. And you observe that the
+blue line is a neural inverse operator, whereas the orange and the red ones are
+deponent and fully convolutional network. And we observe that when we test on a
+a set or on testing samples, which with the most inputs are discretized in the same way as the
+training, then all the model performs fairly well. However, when we move even slightly,
+when we consider even a slightly different number of functions discretizing the input
+operator, now we observe that the neural inverse operator is pretty stable. It performs
+equally well for any type of discretization. Whereas the other two architect, the performance
+of the other two architectures deteriorate immediately when we consider a different
+number of functions. And the results become even 10 times worse. And we have seen a similar pattern
+for the Arthell-Lang's problem for inclusions of the detections. And this proves at least
+experimentally, again, we don't have rigorous guarantee. It proves at least experimentally
+that the architecture is independent of how many functions we choose to discretize our input
+operator. And we observe similar results also for optical imaging, seismic imaging, and so on.
+Now one additional experiment is very similar to before. Instead of testing the architecture
+on a set of input data defined by L tilde functions with L tilde smaller than L, which was
+the training one. Now we test the architecture with a set of test data whose input are discretized by
+using L tilde functions between 10 and 100. So less and also more functions compared to what we use
+for discretizing the input operator during the training. And you observe very similar behavior.
+So this is the typical V-shape pattern that we see when we have this type of non-invariant
+discretization of the model. And now what we consider next is the so-called
+out-of-sample distribution. Because so far we've always considered a set of testing data
+which are unseen during the training, but still belongs to the same distribution of the training
+data, which is common practice in machine learning. So if you consider core volume or like
+the inclusions of the detections, during the training data we add one to four
+scatterers. During the testing inference we also consider a set of testing samples,
+including from one to four scatterers. And now what we want to do is to check how the model
+performs when you change the underlying distribution of the testing data. So instead
+of considering, for instance, scatterers which are squared, we consider scatterers which are
+circle and see how the model performs when you change this distribution, when you slightly
+perturb or change this distribution. For instance, we consider in the case of the inclusion
+detections instead of one to four scatterers, five scatterers, and then the model has never
+seen five scatterers. And the performance is still pretty good. And similarly, instead of
+considering one to four scatterers with the same shape, we consider one to four scatterers with
+different shapes. And also in this case, the performance remains pretty good. Of course the
+deteriorates because those are completely unseen out of distribution samples, but still the model
+performs very well. And also for the art and lungs, instead of defining the training, the
+testing data by perturbing a reference solution by 8 percent noise, we perturbed by 12 percent
+noise. And in this case, the performance is exactly the same. And this is actually
+quite surprising because, as I mentioned initially, the inverse map is stable, but still is weakly
+stable. And actually people in the field of inverse problems almost consider
+this type of weak logarithmic stability almost equivalent to no stability at all. So it was
+quite surprising to see that despite the nature of the map, also by changing the underlying
+distribution, the model was performing fairly well without providing completely random prediction.
+And again, we don't have a reason why this happens, but the heuristic is that
+by training the model, you kind of enforce some stronger form of stability
+of the architecture itself because you kind of restrict the functions that the model can
+return to a specific class of functions. You will not get, by training the model on scatterers,
+something which looks like the art and line spontane, because of course the model has been
+trained on the specific task. And one additional example was ablation study. We wanted to see how
+additional free layers and randomized patch impacts on the performance of the model because
+after all, it might have also not brought to any improvement. And what we observe here is
+the blue line is neural inverse operator with the Fourier layers and the randomized patch
+algorithm. The purple one is a neural inverse operator without the randomized patch.
+And the light blue is a neural inverse operator without the Fourier layers.
+And you observe that for all the experiments, if we include both the Fourier layers
+and the randomized patch, the model performs way better compared to not having either one
+or the other. And this is for different discretization of the input testing operator.
+So to conclude, because my initial claim was, okay, we tried to approximate the underlying map
+because the actual inverse problem, solving the actual inverse problem with traditional
+numerical methods is very expensive. Is this actually true? So what we did was to compare
+the performance of the model with the performance achieved with the traditional
+numerical methods. And you can see this one is the Arten Lang coefficient reconstructed through
+a traditional scheme is way more blurred compared to what the model reconstructs. And also
+the computational time for obtaining these is around two hours. Whereas the inference time,
+only the inference time for a neural inverse operator is 0.1 second. And this is actually not
+a property only of NIO, but all machine learning models perform equally well in terms of computational
+time as the as neural inverse operator. So it's more like, if we can use machine learning
+to actually solve this inverse problem in lower computational time. We did the same also for
+the inclusions of the detections. And I would like to highlight that this sample is an out-of-distribution
+sample because remember the training data we trained the model with was defined by
+a sculptors of all the same shape. Instead here we consider a set of sculptors with different shape.
+And you can observe that NIO, even on these samples, which is smaller and never seen,
+it kind of sees that there is something going on and it provides some more blurred around the
+object. Whereas it captures very well the edges of these two because these are
+similar size of the one that the model has seen. And again, this one, two percent error in 0.5 second,
+whereas with PD constraint optimization took 30 minutes for with a 10 percent error. Similar results
+also for seismic imaging. So where do we stand and actually where we would like to go? So
+as you have probably noticed, we don't have at the moment any mathematical guarantee.
+And what we would be nice is to construct an upper bound on the error of a neural inverse operator
+and to see how the discretization of the input operator impacts on the performance, how other
+features impact, for instance, on the error. And also, one additional thing that we would like to
+work on is to improve the generalization performance of the model on these out-of-sample
+distribution. And so I think I would like now to stop and thank you very much for your attention.
+Thank you, Roberto. And if you have any questions, I would be happy to answer.
+Okay, so that's sweet. Do we have questions for Roberto?
+I feel like I've asked a lot, but I do.
+So I was wondering, can you go back a couple of flights to the images you showed of the
+different shapes of these one? Yes, exactly. So I'm looking at this and I'm thinking,
+so your scatterers are like blobs with one like high intensity point in the middle, right?
+Yes. So in terms of application of this study, do you really need this whole,
+like to reconstruct the whole image? The prediction should be a reconstruction of the whole thing?
+Or would, for example, just trying to figure out the location of the three scatterers,
+like X, Y coordinates? It depends on the application and also, I mean...
+Yeah, that's what I'm interested in, like in terms of application.
+I think in medical imaging, you would like to reconstruct the entire image.
+And also because if you, so let's say, one way is also, as you mentioned,
+is to predict where they are located. However, in this case, you are assuming that you know
+how the coefficients look like. So when it comes to then coefficients where might have different
+form from what you guessed, then you would have no idea how to actually reconstruct the
+coefficient. You see what I mean? Instead, in this case, it's completely unparametric,
+because it just reconstruct the image without any type of assumption on how the image
+should look like, any parameterization. You are not predicting the size of the scatterers
+and the location of the scatterers. So if you're given a different task, maybe you have
+I don't know, you want to predict also the shape, then you wouldn't be able to do it if you
+constrain yourself to a given parameterization of the state that you are looking for.
+I agree. That leads me to the next question, which is how robust it is to the geometries.
+How good, if you have a non-convex geometry or some crazy star-shaped geometry,
+will you be able to pick up those? We don't know yet, but that's what we are
+working on at the moment. Actually, yes. Thank you. You're welcome.
+I think Professor Erhard has some questions until you. Yeah, we can hear you now.
+Okay. Yeah, thanks for this very nice talk. I have maybe a more fundamental question.
+I was wondering if your approach is somehow independent of the type of PDE.
+You have three different types of PDEs, but somehow you didn't dive into the details.
+I mean, if you think about stability estimates, then the stability estimates are very different
+for each type of PDE. Is a method really independent of the type?
+No, no, no. We train each model for each benchmark and for each PDE. The models are
+agnostic with respect to the physics. If your underlying problem is governed by
+radiative equation and then you apply a model which has been trained, let's say, on data generated
+by solving Poisson equation, there is no hope that the model is going to provide you reasonable
+inaccurate reconstruction unless you incorporate in the model itself, either with the
+architecture or the loss, some information about the PDE itself. But this is a completely data-driven
+model. So the model sees at the moment completely agnostic of the physics, and it sees an input
+and returns an output, no matter what is the PDE, the underlying PDE. Of course, if the
+underlying PDE is different compared to what you are trained on, then the model performance
+are going to be terrible. Yeah, and maybe one small extra question. Maybe I missed it.
+Do you need the knowledge of the fundamental solution of the PDEs, or are you computing the
+fundamental solutions? No, no, no. We are not computing fundamental solutions. We are not
+computing green functions. We simply have a code which solves the underlying PDE. What we
+do is to assign the boundary data, solve the underlying PDE, and obtain the corresponding
+observable, given the problem at hand. So again, for the Poisson equation, we assign the voltage,
+we compute current, but we don't assume anything about green functions, fundamental solutions,
+or anything. Okay, thanks a lot. I've got a question. I'm Sukho again from Davis.
+So you mentioned about the problem being ill posed. So from the boundary data, you can get
+different realizations of A of x, y, right? So is it possible that for a given solution,
+you can construct actually two functions A of x, y, which give the same solution, boundary data?
+I see what, okay, so I should have been probably more clear. The problem is ill posed when you
+consider a single set of measurements. So again, if you, or very few measurements, if we go back
+here. So if you, if you consider the EIT, you compute the intensity of the current for one
+single realization of the boundary condition, and then given these single measurements,
+you try to infer the coefficient, then the problem is ill posed. But when you set it
+in the framework of operators to function, or namely, if you collect many different
+realizations of the intensity of the current, each obtained by different realization of these
+voltage, then the problem is stable, even though it's a weakly stable.
+Yeah, that's right, because you were showing many exact coefficients, then comparing to what
+you obtained, right? So then that's what was not clear. Okay, also the second question is
+many other questions that people are asking. So if you just have a triangular domain instead of,
+say, a square or a circle, can you still do what you're doing by just mapping the
+triangle to a square and proceeding or? Okay, so the main reason why we used
+why we used Cartesian and square domains is that we used these Fourier layers.
+And in Fourier layers, what it is done is to compute the Fourier transform of the input,
+then to multiply by some learnable parameters and then compute the inverse Fourier transform.
+And these Fourier transforms is computed with the FFT algorithm. And to use FFT, you need to
+have Cartesian domains. So the way you can, so one way to do it, if you have like triangular
+domain, so what you can do is you consider, and that can be everything, that can be a
+discrete version of the triangular domain, some just sample, pick that random, then you do everything
+exactly, you do the same with that we did before up to this point here. And now,
+what one can do in order to still be able to use FNO or like these Fourier layers is to
+include an additional transformation which maps this triangular domain into a square domain,
+do all the reconstruction and then map back to the triangular domain to obtain the coefficient
+on triangular domain or replace directly these Fourier layers. Yeah, I was asking because, you know,
+whenever you construct a map from a triangle to a square, of course, the Jacobin will vanish
+at one point, right? So that does cause an issue because if you can do that, then
+in potentially I think you could even do unstructured, you know, domains, right?
+I mean, the authors of the paper of FNO also proposed these geo FNO, which does exactly this.
+And they even mapped airfoil domain to Cartesian domain, which are not topologically
+the same equivalent. And they got some reasonable results. I don't know mathematically if, I mean,
+in practice, it should be doable. I don't know if it makes completely sense from a rigorous
+mathematical perspective. That's, that's, I don't know. Because I don't know what will happen
+to the Fourier coefficients when you have, you know, when the Jacobin is not, you know,
+I mean, because I wouldn't know. I wouldn't know. Actually, I'm not able to answer on top of my
+ad like this question. I had no idea. Also, because in the end, like the parameters, I mean,
+you still compute these coefficients, but then you multiply them by these learnable
+parameters that you learn during training. So it's very difficult to say what's going to
+happen. Because when, you know, when it comes to training and machine learning, everything is
+very sure. So thanks.
+Some data. Who proposed GFNO?
+No, we proposed it in the deep one. Exactly. It's in our paper. We proposed it before the
+GFNO is in the paper, fair comparison of 16 different benchmarks. So we could do it with
+both the DFNO for dimension consistency and also the geometry. We try to help them.
+Okay. All right. That came before I see it. I was wondering if Umair,
+are you in the audience? Umair may have a question, but okay, no.
+Good discussions from that. Maybe we can go to the next one. Very, very good discussion.
+Robert, thank you for the nice talk. Thank you. It was very a great pleasure.
+You can speak up for our second talk, actually, Alberto. Okay. Thank you. Maybe
+you can stop sharing, maybe? Yes. It's all European today.
+It's nice. It's nice. I like it. Thanks again.
+So we've moved to our second speaker, a second presentation. It's a joint presentation by
+Professor Jose Antonio Font and his student, Antonio Ferrer-Shanzitz.
+So you may want to share the screen when I introduce you to the audience.
+Sure. So Professor Font is a full professor of astronomy and astrophysics in the University
+of Valencia in Spain. He has many years of experience in large-scale supercomputing
+application in relativistic astrophysics, in particular in the fields of
+numerical relativity and relativistic hydrodynamics. Having co-authored over
+250 articles in peer-reviewed journals, he is a member of the Spanish Royal
+Physical Society and the Spanish Astronomical Society. His student, Antonio, is a
+second-year PhD student in the same university. His primary research area is mainly focused on
+the development of deep learning applications applied to physics. His ongoing thesis focuses
+on the utilization of pins to address challenges to explore the boundaries of fundamental physics,
+in particular with the domains of astrophysics and astronomy. With that, please join me in
+welcoming both of them for today's presentation. So thank you very much Sundata.
+Thank you very much. So as you were saying, this will be a joint presentation. I will start
+presenting the actual problem that we want to solve with pins, which are relativistic
+hydrodynamics, room problems, and relativistic hydrodynamics. And then later on, Tony Ferrer
+will talk about the actual method, the gradient-annihilated physics-informed neural
+network method that he has developed. So this is, first of all, we would like to thank you
+for the invitation and for your interest in this work. So I hope you like our presentation.
+So this is a paper we have recently submitted, which is done by these five people here and
+have listed in the title. All of us belong to the University of Palencia in Spain.
+Okay, so let me see. It seems like I cannot... Okay, there we go. Can you see my screen well?
+Can you hear me well as well? Yes. Okay, so this is the outline of the presentation. So
+basically I will give a brief introduction and motivation to the physical problem we want to
+solve, which is relativistic hydrodynamics with physics-informed neural networks. That would
+be my part. And then Tony's part would be the second part for the actual method, as I
+was saying, and the application to see how these pins actually perform to solve room
+of problems in relativistic hydrodynamics. So these are some of the keywords of the presentation.
+So the first keyword is room and problem. What is a room and problem is basically an
+initial value problem with these continuous conditions. Then neural networks, for our choice,
+would be a physics-informed neural network. And then the physical application would be
+the earlier equations, but in the relativistic case, not the classical equations of Newtonian
+hydrodynamics, but the earlier equations of relativistic hydrodynamics. All right, so as you
+all know, since they were proposed first in the seminal paper by Reisi Perdicaris and Karniadakis
+in 2019, nowadays physics-informed neural networks have become very widely used
+techniques to solve numerical differential equations based on machine learning.
+So these neural networks compute the solution of partial differential equations
+incorporating physical information, both in the architecture of the network and in the
+training procedure. So they learn from both the data and most importantly from the physical
+loss of the problem. And these second parties, in my opinion, what makes them very, very
+interesting for physical applications. So we know that partial differential equations
+continuous partial differential equations can be approximated or solved with neural networks.
+There is this theorem by the universal approximation theorem by Pinkus
+that guarantees that in principle, this is the case. However, if we have discontinuities
+or discontinuous solutions in the PDE, there is no theoretical background that
+ensures that the neural network is actually going to produce the correct result.
+And in the case of hydrodynamics in particular, we have this issue of since this is a nonlinear
+hyperbolic system, you are always going to be facing these continuous solutions, even if the
+initial data is smooth, just because the equations are nonlinear. So we know how to solve
+hydrodynamics, nonlinear hyperbolic equations using finite volume methods,
+but this is not the point, the point of our study was to see if using pins,
+we can actually also solve those equations because for finite volume methods we have some issues
+when trying to solve those equations in the case of relativistic hydrodynamics that I will briefly
+mention in a minute. So let me tell you a little bit about what we are interested in solving
+these relativistic hydrodynamics equations. They are obtained from local conservation
+laws, local conservation laws of a tensor, the stress energy tensor, that has the content of
+the momentum of the fluid and the energy of the fluid, and also the conservation law of the matter
+current density. You see my pointer, these are those equations written here on the left of the
+screen. So this nabla mu is a covariant derivative associated with the four dimensional space
+time metric. And then the current density of the matter is given by this quantity j mu,
+which is the rest mass density of the fluid times the four velocity.
+So these indices here, the Greek indices go from zero to three, those are space time indices,
+zero is for time and one, two, and three is for the spatial coordinates.
+And then T mu nu is the stress energy tensor, as I was saying, that typically for most
+application people consider a perfect fluid. So the stress energy tensor of a perfect fluid
+is this quantity here, where we have also introduced this H, which is the enthalpy,
+and P, which is the thermal pressure. T mu nu is just the metric, the inverse metric.
+So now these covariant equations here have to be explicitly written in terms of a coordinate chart.
+And then once you select a coordinate chart, these equations transform into those equations
+here on the bottom right part of the slide. So this is a balanced law equation. These are
+five equations. So you have here the conservation laws of mass density, the conservation law of
+momentum, and the conservation law of the energy. It's not strictly speaking, it's not a
+conservation law, because you have terms on the right-hand side of the equations, but those
+terms do not depend on the state vector of the equation. They only depend on the metric.
+So if we were in a flat metric, in the inverse metric, those terms on the right of
+the equations on the source terms would be exactly zero. But if we were in Cartesian
+coordinates, if we were in pervelinear coordinates, we would also have some geometrical sources.
+But it's not much different to what we have already in the case of the Euler equations
+of Newtonian heterodynamics, where in pervelinear coordinates you can also have these kind of
+geometrical sources. All right, so there are many formulations actually to solve those
+equations. They depend on the choice of the slicing of the spacetimes, because the level
+surfaces of the time coordinate can be spatial, or can be light-like or null. So the space-like
+hypersurface is the most widely used in numerical relativity, and this is called the 3 plus 1
+formulation of relativity of the Einstein's equations and the hydrodynamics as well.
+And the second choice that we have is the primitive variables, the physical variables
+with respect to which we will formulate the problem. So those physical variables are typically the
+res mass density, the velocity of the fluid, the pressure, the enthalpy. But it turns out that
+in the case of the relativistic hydro equations, we have a different set of variables. Our
+conserved variables are not actually the physical variables. The state vector is a vector that
+is constructed from some basic primitive variables. And then this complicates a little bit
+the algebra when trying to solve those equations. So already back in the 70s, these equations were
+people tried to solve those equations in full 3D, but they were formulated as a set of
+advection equations. And the price to pay by doing that was to move to the right-hand side,
+terms that broke the conservative nature of the equations. And it turned out that by doing
+that, there were some limitations when solving the equations in the flows were highly high speeds,
+the so-called relativistic regime with high Lorentz factors, let's say. And then conservative
+formulations, which share some ideas with the conservative formulations in the Newtonian
+case, those conservative formulations for the relativistic equations were proposed in the 90s.
+And here, you have some of the people that presented those formulations. So
+I will be briefly talking about the formulation of Banules et al., the third reference here,
+which is nowadays known in the community of numerical relativists as the valentine formulation
+of the relativistic hydrodynamic equations. Sorry, I have a question about the last slide.
+Sure. Natresca, Sandia. So for the right-hand side, the metric terms that appear,
+shall we interpret those as being constant, or are they a function of the state?
+Is it a given manifold that you're solving on, or is it something that's evolving in response
+to the flow? No, no. I mean, you could evolve them, and you could not. That depends on the
+problem you want to solve. So for instance, if you're studying, say, a merger of two
+neutron stars, or if you're studying the collapse of a star, then the spacetime metric is also
+evolving in time. And then in addition to these two equations, you have to solve Einstein's equations,
+which is the generalization of Poisson's equation for the gravity, for the gravitational field.
+But if the fluid is non-self-gravitating, if the fluid is non-self-gravitating,
+then you can assume that the test fluid approximation is valid, and then those terms
+on the right-hand side are just functions of the coordinates, but they are constant in time.
+Crystal Clear, thank you. Okay, thank you. So as I was saying, this formulation that we proposed in
+the 90s shares many, many, many aspects with the Newtonian formulations of the Euler equations.
+We have a hyperbolic system. It is conservative, and then we can solve those equations using
+the same kind of Godunaw-type methods based on Riemann solvers to solve those equations,
+using the characteristic speeds, the eigenvalues of the Jacobian matrices of the system,
+and the characteristic fields, the eigenvectors of the system. So the tools that we have for
+computational fluid dynamics were translated to relativistic hydrodynamics as well.
+And this is the preferred choice. This is the high-resolution shortcut in the schemes
+based on Riemann solvers. It's what everyone in the community uses nowadays to solve those
+equations, also in the relativistic case. But this is not what we are going to talk about here.
+We're going to talk about how to solve those equations using pins. So let me skip this
+technical part. Let me just go to the system itself that you have here in this slide.
+So you have five equations. Those are the conservation of mass, momentum, and energy.
+In 3D, you have five equations. Then the capital U is the state vector, which are these
+five quantities. The capital D is the relativistic mass density, which is the rest mass density times
+this function W. This W is the Lorentz factor, which is defined here. So Lorentz factor of 1
+means that the fluid is at rest. Lorentz factor of infinity means that the fluid is
+moving at the speed of light. Then the second term in the state vector, Sj, is the momentum
+relativistic density in each of the three spatial directions, J, and is given by this
+particular expression here. And the final term, tau, is the energy, the relativistic energy density,
+where we subtract the rest mass density, the capital D, in order to recover the
+Newtonian limit. This is just a technical point. Okay. And then we have the vector
+of fluxes and the vector of sources. Now, as I was saying before, this vector of sources
+only involves space-time quantities, also fluid quantities, but not derivatives of fluid quantities.
+So in that sense, it is a conservative system. Okay. So this is the system in full, I mean,
+expanding the expressions, what we have in the first square in the top, in full GR,
+in full general relativity. Then on the bottom left, we have the limit of those equations
+in the flat case without gravity. This is the space-time, the Minkowski space-time limit.
+And on the right-hand side at the bottom, we have the Newtonian limit of those Minkowski
+and equations, which are the familiar Euler equations for the, I mean, the continuity
+equation for the mass density, the momentum equation, the Euler equation and the energy
+conservation equation at the bottom. So the equations that we will be solving with
+pins is the system in flat space-time, Minkowski space-time. So the equations on the left
+bottom, and we will be solving them only in one spatial dimension, so in T and X.
+And we will be focusing on Riemann problems in order to apply our pins,
+because we have the exact solution of the Riemann problem and that exact solution,
+we can use as the ground truth to compare the performance of our method.
+Probably you will know what is Riemann problems and initial value problem with this continuous
+initial data and the solution is just basically constant states separated by waves,
+rarifaction waves, shock waves and contact discontinuities. And this exact solution of
+the Riemann problem was obtained for the Euler equations of Newtonian hydrodynamics
+by Godunov in the case in the fifties, at the end of the fifties,
+by considering a perfect fluid equation of the state. And this is used in order to compute
+the numerical fluxes of the finite volume method of the high-resolution shock-capturing method.
+And this solution was extended in the nineties to relativistic hydrodynamics by these two
+authors, Martin and Müller. And this exact solution in the relativistic case
+is the one that we will be using as the ground truth, as I was telling you before.
+And why Riemann problems? Well, when you discretize a, you know, a continuous solution,
+a continuous PDE on a finite grid, what you have is a continuous family of local Riemann
+problems at each cell interface between your neighboring numerical cells. So if you know
+how to solve a Riemann problem, then you have piecewise constant data here in red.
+And then the solution of the local Riemann problems at each cell interface gives you, in
+principle, a way to solve, to advance in time the initial conditions. And this is what is plotted
+here on the left. We have on the second plot here what we have are the different conditions
+for our waves, the shock wave. So for instance, in this interface here, we have that the pressure
+on the right is higher on the pressure on the left. So we will have a shock wave moving to the
+left. And then I contact this continuity in between and a refraction fan on the on the right
+hand side. And on the interface on the right will happen the opposite because the pressure on the
+left is larger than the pressure on the right. So on the top, the image on the top, we have the
+exact solution of the of the pressure profile as a function at a given time as a function of
+the spatial coordinate X. And that solution at time tn plus one can be therefore obtained
+from the from explicitly using this kind of flash conservative hyperbolic or I mean method
+flux conservative methods, which is fully explicit. And then we compute these numerical
+flashes of the cell interfaces and solving Riemann problems. So with pins, we are going to
+sidestep completely that. Well, before going to that, let me tell you, you probably know
+that these high resolution shock after in the skins provide very stable and very accurate
+shock profiles as I'm showing here two different problems that show two problem.
+The solid lines are the contact, the constant, the exact solution and the symbols represent the
+numerical solutions obtained with a with a high resolution shock happening a scheme.
+And the problem on the left is that relativistic short reflection where we have a fluid with
+very high speed that bounces off a wall and then a shock waveforms. And as you can see
+this high resolution shock after in the skins, even if the for very high speed flows, they
+obtain the solutions very accurately. And the discontinuities are propagating at the correct
+speeds and nonlinear features are very accurately resolved. So our goal, our objective is to try
+to see if pins can also reproduce these results and can achieve such good results as as the
+predict the more traditional high resolution shock after in the skins in the presence
+of discontinuities and highest speed flows. Because if we manage to do that, we will also be able to
+study some problems that are yet unsolved in the case of relativistic high dynamics,
+especially more than one dimension. And we will also sidestep a technical difficulty of
+recovering the physical or the primitive variables from the conserved variables, which
+is not not given in close form. So one has to do an iterative process in order to recover
+the primitive variables. And this is very time consuming. If we if we manage to obtain this
+level of accuracy using pins, then we will complete this side step, that particular step,
+the recovery of the primitive variables. And that would be very beneficial in terms of
+performance of the of the method. So this is the main motivation. And at this point,
+I will stop. And Tony Ferrer will talk about the actual method that we have devised in order to solve
+those equations that I have just listed. And if I'm not mistaken, Tony is going to share
+the screen from now on. Yeah, I'm going to share the screen before you turn it over.
+Can you comment on the electromagnetism version of this? It's great. Like,
+like coupling Maxwell and so on, shock magneto hydrodynamics and whether you think that's
+viable with a pin and sure, sure. Yeah, that's actually a very good question. Yeah. So the
+GR hydra, the GR hydra equations have also, you know, the counterpart with magnetic
+fields, the GRMHD equations, they have also been obtained in flash conservative form,
+as a fully hyperbolic system with, you know, all the eigenvalues and the eigenvectors have been
+obtained. So high resolution shock coupling methods are being applied routinely to solve the GRMHD case
+as well. We haven't yet tried the GRMHD case. But this is something that we would like to do
+in the near future, because indeed, it's, you know, it's, it's a more, more extended
+problem and certainly more interesting in many astrophysical applications. But in principle is also
+is a system that in principle can also be attacked with the same kind of method that we are using
+currently to solve the case without magnetic fields, indeed. Excellent, thanks. So you
+should be able to see my screen this moment. Yes. Yes, okay. So I will continue for a bit.
+I would like to start talking a little bit more about the motivation of the, of the work.
+As Toni from said, numerical algorithms may have some drawback when recovering the primitive
+variables, the density, the, the velocity and the pressure or the, or the energy of the fluid
+in terms of the, of the conservative ones, the relativistic, the synthesis of mass,
+moment and energy. So by using pins, this is a problem that pins doesn't care about because
+we can demand the output of the neural network to be whatever we want. And it's, this is one of
+the main advantage that we think that's on the pin side, because we can, we can demand
+the directly the output to be the set of primitive variables. So this is something that
+makes pins a good alternative. But obviously this kind of on numerical algorithms, the high
+resolution schemes are, have been studied in literature and they have proven to, to, to, to
+get, to give a state of the art solutions for this kind of problems. So the first step,
+the first motivation was to check if Avonilla pin, baseline pin is able to, to, to describe
+the discontinuities of their, this kind of Riemann problems because in astrophysics
+is of crucial importance because we may have a violent and extreme situations that usually
+lead to, to these discontinuities in time and space. So this, let's say we have these both
+motivations. So I will just go a little bit faster here because we, we just know what
+how a pin works, but basically we use as input a time and the spatial dimension because we are focusing
+on a one dimensional problems in the Minkowski's test time as, as Tony said, and basically we
+build this U tensor as the output, we will demand it to be the set of primitive variables.
+So we are able to directly get all the rest of all the conserved quantities and therefore we
+can build all the equations and compute them with any kind of problem. So from this moment,
+we just build this F operator that's, well, it contains all the information of the underlying
+physics of the equations themselves. And we just basically willed the loss function as usual
+by this called the soft enforcement. We just consider the first term here is just the term
+that corresponds to the, the PD residuals. And here we can consider all the extra terms that
+the new work needs to meet. For example, here we have the initial conditions. And we can consider
+any kind of experimental data if there is any, of course, and the boundary conditions in space
+and so on. Basically, here we have all the physical external information that the, the,
+the new work needs to, to accomplish. So let's jump directly to the set of equations.
+As Tony said, this set of equations in the Kosovo inform is the straightforward, let's say,
+modification of the classical Euler hydrodynamics. Well, we will directly to the space time,
+because space time, so we can consider fluids that have have velocities
+around or very close to the speed of light, the, the ultra relative cases. And when we consider
+this kind of scenarios, we need to use the set of equations. And well, basically, due to the fact
+of this Lorentz factor, the equations get, let's say, the variables get very, let's say,
+more coupled than the, the classical case. So this is the case, the, the, the reason that we
+don't have any way, let's say, analytical way to, to go for, from the, the, the set of conservative
+variables to the set of primitive variables. So this is a no, unknown drawback in the numerical,
+the high resolution schemes where we have to do this, this is extra step to the
+for the recovery of the primitive variables in terms of the, of the conservative ones,
+because we need them in order to, to, to follow with the numerical resolution. So this is something
+that we pins is something that we can avoid because we just demand the output to be the set
+directly of the primitive variables. So we are able to compute the conservative variables,
+the relative density density of mass momentum and energy, and then we can compute the
+equations with any kind of, of problem for that, for that aspect. So going more into detail
+about the methodology we are, we propose here is mainly based on two parts. The first part is
+something that have been stated on the literature. We can consider the activation
+factors in general, all of the hidden layers of the new or new work and of course of the,
+of the output layers, let's say, we can consider them to be dynamic, understanding dynamic by
+trainable alongside with the, with the loss function. In fact, in this reference,
+the authors get pretty well, let's say results and state of the results in some equations
+that they, they propose there. And we thought that it could be a good option to implement for,
+for our pin because basically what we do is to, to understand this a slow parameter of the activation
+function in general as trainable. So we can get some kind of dynamic function such as here for
+example, the hyperbolic tangent and the segment function where we, what we do by increasing the,
+the slow parameter is we are stretching the activation function. So we are restricting
+the input values, the set of input values that have some information to back propagate for the
+new work. So this is something that may help the new work to perform better in the, in the
+description of this continuity. So this is something that we have considered and the
+second approach or the second part of the methodology is to, to basically introduce
+a new tensor, this call here, this capital lambda tensor that basically will depend in an inverse
+well proportionally inversely to the, to the gradients of the physical variables.
+So we need this function, okay, to deactivate to a certain extent the loss function and
+therefore we are deactivating a little bit, let's say to a certain extent that will be
+measured with a new set of hyperparameters that will be, will be introduced in a minute.
+And therefore by doing this, we are forcing the new work to, doesn't, to basically not care a lot on
+the, the sample points that are in the discontinuity and the proximities of the
+discontinuity. And by doing this, basically the new work doesn't try to interpolate in a,
+in a smooth way the, the points that are under this continuity. So basically the new work
+is helped because we, we, we, as we will see in the, in the results section,
+this kind of, well, this kind of notification helps the new work to, to better describe the,
+the, the points around the discontinuity by just ignoring them to a certain extent. So
+this, let's say this deactivation is measured by two new set of, a set of two new hyperparameters.
+This one of here, this alpha parameter is basically the, the, the weight is proportional to
+each one of the variants of the physical variables, the set of midi variables. And we
+can introduce also a new set of hyperparameters that is called here as beta and they take the
+role of the, the different exponents of the physical gradients. So basically we demand
+we can build several different functions for, with this, with this definition. But basically
+we will want the function to, to be zeroed, that is to deactivate the new work completely
+in the limit where the gradients tend to infinite. And on the contrary, we want the,
+the, the function to recover as a constant factor. So we can get the, the, the, the normal,
+the, the, the manual loss function for the, for the pin when the gradients are totally deactivated.
+So here we have plotted as just a matter of example, the function one over one plus alpha
+times the absolute value of the, of x in general to the power of beta. So we can
+directly see that by increasing the beta parameter that is the role as the spawning,
+we will expect the pin performance to, to be some kind of, well, to get some kind of instability
+because well, we are forcing more the, the, the, let's say the activation of the pin,
+okay, the annihilating, let's say, but we are in some, we can get some kind of
+instability, nomadic instability for some kind of problems, not for others we will see in the,
+in the results section, but this is something that we could expect and in fact it could, it happens.
+And okay, so basically some matter of, of, of example here, we have a diagram that basically
+is the, let's say the fully dense connected as usual when we work with pins with the main
+modification here that of course we have this time over the slots for all of, for each one of the
+hidden layers and for the output, of course we have three different activation functions in general,
+one for the velocity that has to be, has to be restricted in the range of minus one to one
+because we, we want to respect the underlying physics to not speed the, to not go higher
+than the speed of light and the density and the pressure, okay, in general, so the main difference
+comes here in the, this redefinition of the, of the loss that has to, to, to be with the PDS
+underlying equations. So to check the, the performance of the,
+I think there's something I must be missing. So if you're not enforcing continuity,
+right, the idea is that that's the point of your capital Lambda function.
+Then this, in a lot of ways, you must enforce flux continuity through like the Hugonio relations,
+right? This is the same thing as like in DG when you work with a broken polynomial space
+you have to pay for, otherwise you could have fields that, you know, kind of
+separate and lift apart from each other. So can you comment on that that there is,
+you're kind of getting rid of continuity in the field, but you're not enforcing
+conservation anymore? Yeah, we are, yes, I think that I understand you, but basically we use,
+okay, the same set of equations, but we modify the loss function because the,
+well, the loss function is basically the, let's say the heart of the, of the problem,
+because we can use the same, the same neural architecture for different set of problems in,
+in general. So we, by deactivating the neural network, we, well, we don't deactivate it
+totally. We just try to manage by using the set of hyper parameters. We try to deactivate it
+depending on the problem because it's not always good for the, for the result. This is something that
+you have to tune. But yes, we basically enforce the activation of the network in the,
+in the special areas where we have high gradients, going to the limit where we have infinite
+the check gradients where we have the, we got the discontinuities.
+And a co-location scheme, the, the, the role of continuity implicitly gives you the flux
+continuity. Right. So if you're turning that off, you're going to need some sort of penalty
+somewhere in order to recoup that. Right. So I suspect that even if you get good results
+by playing with the hyper parameters, there could be a poor initialization or, or something
+where the scheme will just break unless you introduce a, a penalty or something that's
+going to bring that flux continuity back. Yeah. That could be something that we can,
+we could test in fact, because yes, obviously by, this is, by this modification where we're
+basically modify the, the insert, insert the minor, the, the weighting of the
+through PDEs that are governing the system. But just what we're complicit by doing this is
+basically to force the, the network to not describe in, in a smooth way the, the points
+that, or the sub-import that are in the discontinuity and around the discontinuity.
+So in a certain, in a certain manner, we, as we would see in the results, we get the, the, the,
+that the PIN, this notification of the PIN is then able to see some jumps that the vanilla PIN does not
+and to enforce the, the resolution of the discontinuities. But yes, I agree with you that
+obviously this is still a, a, a room for improvement as we will take at the end of the,
+of the presentation. But we think that the resources that we get are in fact
+promising and obviously this is still work to be done in the direct direction.
+Just to add quickly, just to make sure I understand what you're doing correctly.
+So essentially you're trying to basically penalize, not penalize, basically wherever the
+gradients are very high, you basically don't want to, basically we make the weights very, very small
+so that you don't change it basically, right? Is that the essence of?
+Yes, more, yes, yes, more or less. What we want to do is to, is to weight
+more the, the, the part of the, of the domain that is smooth, let's say. And we, we don't want the,
+the new world to, to be, to focus on the, on the, on the description of these
+discontinuities. And by doing this, the new work is then able to, to solve in a better way
+the, the, the points that are around or let's say that the points that are close to this
+continuity, but we need the new work to a certain extent to ignore the, the, the jump in the domain
+because by having this discontinuity, we have a certain particular, let's say a point in the
+space that is not sampled. So the, the network that it will do in general is to interpolate in
+a smooth way the solution between the, the points that are very close to, from the left and
+from the right. So we then get this kind of interpolation and in, in, and the limit of having an
+infinite train time, maybe we could get also a solution that's very close to the discontinuity.
+But by doing this, what we do is basically we try the new world to ignore the zones with
+high gradients. So we demand it to focus on the proximities and not to describe the
+discontinuities. Basically discontinuity is something that to a certain extent,
+the pin doesn't look at, doesn't pay attention to that in some manner.
+But in the first place, it must at least be able to find it. So once it finds the region of high
+disc, high gradients, then you don't penalize it further, basically. But of course, you must find
+it at least, you must find points where there are high gradients. Otherwise, it'll never, you
+know, the other way to do it will always be large, right? Yes. As we will see in fact in the
+results, that's something that we, when we provide this bit parameter here, the exponent,
+if we, if we demand it to be so high, then the performance gets worse. In fact, because we need
+some kind of representation still in the, in the, in the, in the discontinuity,
+but we want to, well, this is something that obviously this, this set of parameters may,
+we may think of some way to, to update them through the training procedure. But by fixing
+them, they become hyperparameters. So it's needed to, to find some tuning of them. Because if we
+exceed, if we are so, so demanding with a new order and we get a water source and the baseline
+model and the sort of that, that's interesting and we will see in the, in the, in the results. So
+yes. Yes. Basically, we propose for different problems in this field of demand
+problems for different scenarios. This is more or less the general configuration we use.
+We have the same neural architecture, 10 hidden layers and 40 neurons for each one of the layers
+for all the problems. The same activation function, the T stands for the high probability
+tangent. And in the output, this may be some difference because as I said before, we need the,
+the, the U, the velocity to, to be bounded between the, the minus one and plus one
+to respect, in order to respect the physics. And we will be using also the soft plus function
+that some, let's say we have here some, some plotting this is the, I think, this is the derivative
+of the soft plus function. And we have tested using different kind of activation function that
+in fact, the software as function as we will see in one of the problems is better propagated
+through the, through the, through the new work. So maybe suitable for some problems, in particular
+for two of them as we will see in the result sanctions. And basically as a general, general
+configuration, apart from this, we use the, the, well, a learning rate of 20 minus five
+in order to ensure convergence. And a petty world, a sample domain in the, in the, in the,
+let's say the inside of the, of the domain at the space time domain. And in the boundary,
+let's say we have just the boundary in time in the initial conditions. So we have
+two to the, to the power of 15 points, but this is something that we could also play with and,
+and to, to, to find a point where we don't need to sample it more because it's what's
+happened and the, and the new work learns anyway, the solution. In terms of comparing the
+performance of the vanilla pin and our methodology, we use the, the, the, basically the relative
+to a square, not a square that we compare the, what we compare the prediction of the new work
+and the prediction of the, the vanilla of the baseline model. And of course the
+addition of the high resolution schemes that, that Donny said I was playing before
+for the last instant in time, that's it. That will change depending on the problem.
+But basically here we have used a red squares to remark the best performance that's
+it's related into the, the lowest values for the, for the L2 error. And I would like to
+note here, this problem too, as we will see in some slides, is the hardest problems that we have
+considered because we have an exaggerated jump in the, in the density variable. So here is still
+the high resolution schemes are, are better, but our method is still, it is still better,
+but the, it performs better than the baseline model. And for the rest of the problems,
+we get always a performance that's comparable for the, for the high resolution schemes because
+high resolution schemes may be a suitable option when we work with one dimension in space.
+But when going to 2D and 3D, the problem gets harder because we need to do this process of
+recovering of the density, the pressure and the, and the velocity variables. Maybe in the,
+in that, in that point, the, the pins may enter as a, as a pretty good alternative because some
+kind of problems are still not solved. And this is something that we can also investigate and
+to work with, with pins to check if we are able to, to, to extract these kinds of solutions
+even with, with deep learning, even though they are not very resolved with numerical
+algorithms. So here in this plot, we have four suffixes, one for each one of the,
+of the scenarios that we have considered. We have plotted basically the L2 norm error
+in front of alpha. So when alpha is equal to beta and equal to zero, we get the baseline vanilla
+model of pins that's plotted here with this desert black, black line. This is the error
+of the vanilla, vanilla pin for all the cases. We see the fact that, for example, for this problem,
+when we increase in general beta and alpha, we get a better performance. But here, for example,
+as we were talking before, when, when we increase beta too much, so we are enforcing the, the
+new work to deactivate too much in the, in the areas with high gradients, then we can get
+some kind of numerical instability. And this get, this is something that we could get and that is,
+is needed to, to, we need to experiment on that aspect because this kind of hyperparameters at the
+end, we have considered the same alpha and the same beta for all the, for the field variables.
+In general, they can be different, but in terms of make it easier, we just consider the same
+value. And for some problems, for example, this problem of here, we see that there's still
+some noise around the, the performance of the vanilla model. This is a particular problem where
+we only have one discontinuity that's pretty easy to solve by any work. So a methodology is not
+needed, in fact, because a vanilla model solves them in a, in a, in a good way. But in general,
+when we have discontinuities, that we can get one, well, two discontinues for the rest of
+the, for example, and one for the velocity and another for the pressure, then the problem
+gets harder for a vanilla pin to, to solve. Here we have the first example that we have
+considered is the relativistic short shock tube problem. That's the same problem that we have
+in literature, but here in this case we are using velocities that are equal to half of the,
+of the speed of light. So we are in a relativistic regime, then we need to use the, the set of
+Minkowski equations that we say, we saw before. Here on the top for the four problems will be the
+same. On the top we have the solution blue dots for, for our approach, our pin. Here we have the
+same, the same plots, but the prediction made for the vanilla, of the vanilla pin. And
+represented in black, we have the ground solution, the, the, the known analytical solution.
+So as we can see, for example, here in the velocity, by ignoring the, the, the points that are around
+the discontinuity that are very close to discontinuity, we are able to describe, well, obviously there's
+still room for improvement in some cases, but here, for example, in the velocity, this clear
+hole or vanilla pin tends to over smooth the corners and by using this kind of the, the
+activation of the loss function, then we can describe it in a better, in a better way. So
+this case is, as I said, this problem is the hardest that we have considered because
+we have here at discontinuity for the, for the density that's pretty hard to solve by a vanilla
+pin. Here we are using the, the soft plus function by using a sigmoid. We get, we get
+similar results, but are not as good as, as, as this one we have here. That's why maybe the,
+the, the cooperation of the, of the soft plus function is better for, for this kind of problems.
+And obviously, even though the solution is not perfect, as we can check the rigidity, for
+example, in the velocity and, and the pressure, the solution of, of a methodology
+all performs by far, which is the, the, the performance of a vanilla pin because then the
+one methodology is able to, to, to exactly detect where the discontinuity is and to ignore it to a
+certain extent. Therefore, we, we will focus basically on the dots that are strictly on the
+left and still on the right. So ignoring the discontinuity, we are not predicting it. So
+basically we are getting a best, a better performance in that sense because we are not
+forcing the new world to solve them, them as monthly. In this case, this is the easiest problem,
+let's say that where we only have one discontinuity is one of here and the, the other areas with
+high gradients are not really discontinuous, discontinuities. So basically we, in this
+case, we can use a baseline vanilla model pin and then the solution is not bad as we,
+as we can see here. Obviously, when we use our methodology, we get maybe some epsilon of
+performance here around the, the corners. But in general, in this case, for example,
+where we have only one discontinuity, the rest of the, of the variables are very,
+let's say, easy to, to, to solve by the pin. So the, the performance is more or less the same.
+But we can also use our methodology because it's more, let's say, it can be some aspect,
+we can understand it as a generalization of the vanilla pin when we are working with these
+continuities. And the last case we wanted to show is basically a reflexion test. The solution
+is more or less the same, at least at a, at a visual level. But it's true that the, as we, we
+will hear the, the L2 norm is, well, is lower for our methodology. So in fact, it is working,
+performing better. And this is basically because of, of this kind of predictions here
+around the, the corners where we have here the over smoothing of the, of the vanilla pin,
+it tends to over smooth these corners. And here we still get some kind of flatness prediction.
+But of course, if we go, if we go to velocities as to high velocities, when we tend to approach
+the speed of light, this kind of yams gets, gets higher and harder to solve. So as I said,
+this is still room for improvement and for, for the free door work, as we'll tell you lately,
+is basically even more performance that can be achieved. Here, one of the, of the last slides
+that we have, here we present two figures for each one of the problems in three dimensions.
+This is the, the loss, the loss that we are using that's being witted by the, by the, this
+annihilation of the gradients. And here on the right we have the loss for the vanilla pin.
+And the most important thing that I want to, to note here is that the initial condition is
+basically the, well, alongside with the loss function in terms of methodology, but physically
+the initial conditions are the core of the problem. So if the initial conditions are not
+well described, then we cannot expect a very nice resolution for the next steps in time.
+So here, when using a vanilla pin, we can see that in general, the most amount of the error,
+the physical error is bounded around the t equal to zero and around the initial instance of time.
+And by waiting the, the, the physical loss, what we accomplish and we can check, we will check it by,
+by predicting just over t equal to zero, then the initial conditions are in general
+better described. And since the initial conditions, we don't have too much error there,
+we, we can more or less ensure that the propagation of the error will be minimal,
+except for some cases, such as here, for example, that we have a peak,
+but it's just, can be considered just another layer for a certain internal time. And we can
+just, nothing too much about it, but in general, the error for time steps that are close to the
+initial time is the reduced by a lot when using this kind of loss. And just in terms of,
+of ending here, we have loaded as, as a two heat, as a 2D heat map, the, the lambda function that we
+get off of training. Here we have the, these blue zones, these continuities for the three variables
+and we can mix where we, this can be so mixing with diffusion, let's say diffusion zones of the,
+of the, of the fluid. And when we got some, some green color, for example, here, it means that this,
+this continuity is just for the, for the, for one of the variables, as we had here this problem,
+this corresponds to, to this, this continuity of here of just for the density and the blue zones
+of this heat map will correspond to expansion zones where the gradients are big, but in
+comparison with the rest of the, of the space time, but we get some, some, let's say, gradual
+increasing of the gradients. So we expect that by naturally detecting where these
+continuities are and where the zones where we have the, the, the, the largest gradients,
+we expect the new work to work, well, the performance of the new work to work better,
+to be better. And just to recap a bit, what, a little bit, what we said,
+of course, when we are working with one dimensional problems in astrophysics, using a resolution
+schemes, high resolution schemes, numerical, numerical algorithms in general that are very
+well studied in the, in the, in the field can be a suitable option. But when we go to,
+to D and 3D, since we have this drawback in the Minkowski equations, we have this
+drawback that we have not in the case of classical hydrodynamics. This is the fact that we cannot
+recover in an analytical way the primitive variables of the, of the fluid in terms
+of the conservative one. So we expect the, the pin to be in general deep learning methods
+to be an alternative, a suitable alternative. When we want to solve the problems in two
+dimensions and in three dimensionals in the space, there's something that, that we want to test
+as a future work, of course. And it's very important for the field of astrophysics because
+we have some kind of problems in the, in the astrophysics domain that are not
+solved, or at least they are not solved to the, until we get the performance that we really
+want. So deep learning basic methodologies can enter into the field as a, as a suitable alternative.
+And of course we will, we will want to, to, to work on the direction and to, to, to improve
+our methodology and, and check if we are able to describe some new phenomena that's not being
+solved in, in astrophysics. And of course, the something that we can do is to, to go to
+the ultra relativistic regime where we have initial conditions of the velocity that are very close
+to the, to the velocity, to the speed of light. So we need to, to learn very well the, in fact,
+the velocities because the final resolution in town will depend, mainly depend on the, on the
+initial values of the velocities in these ultra relativistic domains. Something that we
+can work with is also, as Tony said, in the source term of the question that for our question is zero
+because we are working in Minkowski and Spestheim. So we have not, we have no curvature and a
+bit extension of the work by using this kind of methodologies will be to, for example, consider
+an arbitrary, let's say, metric and Spestheim. So we got this kind of new terms and then we
+can check if a methodology based on the learning is able, is still able to solve them properly.
+And of course, a possible extension of the work is to go, as I said, to, to the, to the problems
+and then we are able for, we're using the same kind of architecture of architecture. We are
+able to, to solve different problems. We can solve problems in, well, in classical, in the
+classical domain in the relativistic domain with no curvature, we can enforce the Spestheim to
+be, to, to have some remaining tensor of curvature. Then we're using the same architecture just by
+enforcing the, the different physical constraints through how the, the, the loss function we are able
+using the same, let's say, basic methodology, we are able to extract information and to simulate
+different problems in, in, of, in astrophysics, in astrophysics field that are, can be in
+general from, of, of different nature. So that is more or less that everything that we wanted to,
+to talk about. And thanks for attending and I hope that this meeting has been
+useful for you all. Thanks. So you have any kind of question?
+Thank you, Antonio. Thank you, the point. Do we have questions for our speakers?
+Mr. Sukumar, you wanted to ask some questions? This is unmuted.
+Hi, I just wanted to know, in terms of the hyperparameters or even, I mean,
+if you change the width and depth of the network and, or, you know, what are the things you have to,
+how robust is it, right? I mean, in terms of, you show, so how, what are the, you know,
+plus and minuses, I would say, right? In, well, in, in all the scenarios that we have
+considered, we just take alpha equal to beta equal to one, because we can, well, this set of
+hyperparameters in general, as, as they are defined, they can be different. We can get
+some alpha row, alpha u and alpha p. So we can get different values. Yes. So
+as they are hyperparameters. So if we enforce them to be constant from the beginning of the
+training, we should make some kind of study more into detail such as this, where we can
+more or less calibrate, let's say, in this case, we have the analytical solution, and it's more or
+less easy. We can say that. But in the case where we don't have any analytical solution,
+we may think of a way of somehow updating the, the, this set of parameters through the, the
+training process, or maybe we can consider them to be trainable throughout the training process.
+So the, the, the main optimal, well, the optimization by itself, the text, which is the
+best way of updating them through the training. So, but let's say that the
+numerical instability, since these kinds of equations are
+sensitive, very sensitive to initial conditions. Just for example, for the Lawrence factor,
+that's one of the, of the reasons we expect and that has been proven that
+by in this, this exponent of here, we can not consider it. Of course, we just can, can get
+the alpha parameter by, by, but by considering this, this set of beta parameters, we were able
+to get some more flexibility. But the, we expect them stability. And in fact, that's what
+happens. The stability in the numerical resolution mainly comes in general, when we increase too much
+the, the value of beta. So when we enforce the new work to, to, to that too much, in fact,
+the new work needs to still get some information of the discontinuity and the,
+of course, around the discontinuity. But yes, for example, in this case, by increasing the
+beta parameter, we expect to, to get better results. This in red here, pretty better results
+in far, in far more or less a half of an order of magnitude in the two norm. But yes, of course,
+there are parameters and we need to, to, to some calibrating before, before the training. But
+more or less alpha equal to beta equal to one, it sounds to be not too aggressive
+a modification, not too aggressive of the vanilla pin. So that's what we use in the, in the, in the
+scenarios. What about the width and depth? You just fixed it and leave it as what you picked
+initially showed you initially, or have you tried, you know, increasing the depth, for example,
+or is it robust, or does it change dramatically or not? Do you, do you mean the, the new
+architecture, right? Yeah. Yes. In this one for the further problems, we consider the same
+new architecture. We have tested several configurations, because maybe 10 hidden layers
+is probably enough and too much in some cases. But as we have some GPO power, we can consider a
+big new work, but we have been doing some tests by decreasing the size of the, of the, of the new
+network. And we don't see any, any, let's say, we see some good robustness. Obviously, if we, if we
+decrease too much the, the depth of the, of the, of the new network, maybe we arrive at a point
+where we need more weights for the problem to be, to be, to be fully described. But in fact,
+since we are working with equations that are not very easy from a mathematical, mathematical
+point of view. And of course, if we go out to equations in the general, in the general
+activity regime, we will expect to, to not be, to not get problems for, from the, the
+architecture network. So we get, we put tons of, let's say, not tons, but in this case, just 10
+hidden layers. And we expect that we can forget more or less about the, this, this aspect and
+just focus on the loss function. Because in the loss function, we have all the physical
+information, let's say, of course, there are some problems, for example, we can get
+some scenarios of initial conditions where, for example, the, the pressure variable may be so
+difficult, or maybe harder to, to solve than the others. And therefore, in that kind of
+situations, we may need to split the following dense connecting layer into, into two, let's
+say, two, two different legs, for example, we can consider one leg explicitly to use this
+kind of weights just for the pressure variables. And then we use a separate set of weights for the
+rest of variables. But these problems that we are working with here, we don't need to, we don't
+need to, to, to worry a lot about the architecture, the new architecture, because it's more or
+less robust. So I think one more point might be that, you know, I don't know if you can
+explore in your context.
+Sorry, I'm hearing you a little bad, I guess.
+The voice got bad.
+Is it just me or is it all of us?
+The important, the very important, the very important part of the way, the, the, the, the, the
+one that I mentioned might not be right.
+Is there some connection issue?
+Yes.
+So if it happens, I guess.
+Can you hear us? Maybe he got disconnected. Yes. Yes. Do you want to ask him the question
+that you had? Does anyone have more questions for Antonio? It's okay. I think Chris Zhao had a
+question I think that already got answered with what Professor Sukumar asked. Do you have more
+questions, Chris? So thank you Professor Font and thank you Antonio for taking your time out
+and giving us this presentation today. Thank you so much. Thank you so much. So we would be
+actually uploading the recording of today's presentation on our YouTube channel. So please
+feel free to follow us over there. Thank you everyone for tuning in and have a great weekend ahead.
+Thank you. This time for you. Thanks. Bye. Goodbye.
